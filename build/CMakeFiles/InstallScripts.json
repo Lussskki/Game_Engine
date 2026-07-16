@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"Z:/Server/Engine_OpenGL/Renderer_Opengl/Engine/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
