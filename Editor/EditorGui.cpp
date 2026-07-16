@@ -2,6 +2,7 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <cstdint>
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
@@ -53,9 +54,10 @@ void EditorGui::BeginFrame()
     ImGui::NewFrame();
 }
 
-void EditorGui::Draw(Scene& scene, float deltaTime)
+void EditorGui::Draw(Scene& scene, float deltaTime, unsigned int viewportTextureId)
 {
     DrawMenuBar(scene);
+    DrawViewport(viewportTextureId);
     DrawHierarchy(scene);
     DrawInspector(scene);
     DrawStats(deltaTime);
@@ -76,6 +78,11 @@ bool EditorGui::WantsMouseCapture() const
 bool EditorGui::WantsKeyboardCapture() const
 {
     return ImGui::GetIO().WantCaptureKeyboard;
+}
+
+bool EditorGui::WantsTextInput() const
+{
+    return ImGui::GetIO().WantTextInput;
 }
 
 void EditorGui::DrawMenuBar(Scene& scene)
@@ -99,6 +106,7 @@ void EditorGui::DrawMenuBar(Scene& scene)
 
         if (ImGui::BeginMenu("View"))
         {
+            ImGui::MenuItem("Viewport", nullptr, true, false);
             ImGui::MenuItem("Scene Hierarchy", nullptr, true, false);
             ImGui::MenuItem("Inspector", nullptr, true, false);
             ImGui::MenuItem("Stats", nullptr, true, false);
@@ -107,6 +115,30 @@ void EditorGui::DrawMenuBar(Scene& scene)
 
         ImGui::EndMainMenuBar();
     }
+}
+
+void EditorGui::DrawViewport(unsigned int viewportTextureId)
+{
+    ImGui::SetNextWindowPos(ImVec2(285.0f, 30.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(680.0f, 520.0f), ImGuiCond_FirstUseEver);
+
+    const ImGuiWindowFlags viewportFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+    ImGui::Begin("Viewport", nullptr, viewportFlags);
+
+    m_ViewportHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+    m_ViewportFocused = ImGui::IsWindowFocused();
+
+    ImVec2 available = ImGui::GetContentRegionAvail();
+    if (available.x > 1.0f && available.y > 1.0f)
+    {
+        m_ViewportWidth = static_cast<int>(available.x);
+        m_ViewportHeight = static_cast<int>(available.y);
+
+        ImTextureID textureId = static_cast<ImTextureID>(viewportTextureId);
+        ImGui::Image(textureId, available, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+    }
+
+    ImGui::End();
 }
 
 void EditorGui::DrawHierarchy(Scene& scene)
@@ -184,6 +216,8 @@ void EditorGui::DrawStats(float deltaTime)
     const float fps = deltaTime > 0.0f ? 1.0f / deltaTime : 0.0f;
     ImGui::Text("FPS: %.1f", fps);
     ImGui::Text("Frame: %.3f ms", deltaTime * 1000.0f);
+    ImGui::Text("Viewport: %d x %d", m_ViewportWidth, m_ViewportHeight);
+    ImGui::Text("Viewport hovered: %s", m_ViewportHovered ? "yes" : "no");
     ImGui::TextUnformatted("Renderer: OpenGL");
 
     ImGui::End();
@@ -197,9 +231,9 @@ void EditorGui::DrawControls()
     ImGui::Begin("Controls");
 
     ImGui::TextUnformatted("Camera");
-    ImGui::BulletText("WASD: move");
-    ImGui::BulletText("Space/C: up/down");
-    ImGui::BulletText("Right mouse drag: look around");
+    ImGui::BulletText("Hover Viewport, then WASD: move");
+    ImGui::BulletText("Hover Viewport, then Space/C: up/down");
+    ImGui::BulletText("Hover Viewport, then right mouse drag: look around");
 
     ImGui::Separator();
 

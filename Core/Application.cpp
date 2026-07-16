@@ -54,26 +54,26 @@ void Application::Run()
             m_Window->RequestClose();
         }
 
-        const bool guiWantsMouse = m_Gui.WantsMouseCapture();
-        const bool guiWantsKeyboard = m_Gui.WantsKeyboardCapture();
-        const bool cameraLookActive = m_Input.IsMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT) && !guiWantsMouse;
+        const bool viewportHovered = m_Gui.IsViewportHovered();
+        const bool cameraLookActive = viewportHovered && m_Input.IsMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT);
+        const bool textInputActive = m_Gui.WantsTextInput();
 
         m_Window->SetCursorCaptured(cameraLookActive);
 
-        if (!guiWantsKeyboard || cameraLookActive)
+        if (viewportHovered || cameraLookActive)
         {
             m_Renderer->UpdateCamera(m_Input, deltaTime);
-            m_Editor.Update(m_Scene, m_Input, deltaTime);
         }
 
-        const float width = static_cast<float>(m_Window->GetWidth());
-        const float height = static_cast<float>(m_Window->GetHeight());
-        const float aspectRatio = height > 0.0f ? width / height : 1.0f;
+        if (!textInputActive)
+        {
+            m_Editor.Update(m_Scene, m_Input, deltaTime, viewportHovered);
+        }
 
-        m_Renderer->BeginFrame(0.08f, 0.09f, 0.11f, 1.0f);
-        m_Renderer->DrawScene(m_Scene, aspectRatio);
+        m_Renderer->RenderSceneToViewport(m_Scene, m_Gui.GetViewportWidth(), m_Gui.GetViewportHeight());
+        m_Renderer->BeginScreenFrame(m_Window->GetWidth(), m_Window->GetHeight(), 0.035f, 0.038f, 0.045f, 1.0f);
 
-        m_Gui.Draw(m_Scene, deltaTime);
+        m_Gui.Draw(m_Scene, deltaTime, m_Renderer->GetViewportTextureId());
         m_Gui.EndFrame();
 
         m_Window->SwapBuffers();
@@ -89,3 +89,4 @@ void Application::Shutdown()
 }
 
 }
+

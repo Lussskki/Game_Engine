@@ -11,7 +11,7 @@ namespace Engine
 class EditorController
 {
 public:
-    void Update(Scene& scene, const Input& input, float deltaTime);
+    void Update(Scene& scene, const Input& input, float deltaTime, bool allowMouseRotation);
     std::string BuildWindowTitle(const Scene& scene) const;
 
 private:

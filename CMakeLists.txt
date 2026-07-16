@@ -20,6 +20,7 @@ add_library(RendererEngine STATIC
     Input/Input.cpp
     Platform/Window.cpp
     Renderer/Camera.cpp
+    Renderer/Framebuffer.cpp
     Renderer/Mesh.cpp
     Renderer/Renderer.cpp
     Renderer/Shader.cpp

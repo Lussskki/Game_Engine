@@ -7,7 +7,7 @@
 namespace Engine
 {
 
-void EditorController::Update(Scene& scene, const Input& input, float deltaTime)
+void EditorController::Update(Scene& scene, const Input& input, float deltaTime, bool allowMouseRotation)
 {
     if (input.IsKeyJustPressed(GLFW_KEY_N))
     {
@@ -91,7 +91,7 @@ void EditorController::Update(Scene& scene, const Input& input, float deltaTime)
         selected->TransformData.Rotation.x += rotate;
     }
 
-    if (input.IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
+    if (allowMouseRotation && input.IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
     {
         selected->TransformData.Rotation.y += static_cast<float>(input.GetMouseDeltaX()) * m_MouseRotateSpeed;
         selected->TransformData.Rotation.x += static_cast<float>(input.GetMouseDeltaY()) * m_MouseRotateSpeed;
@@ -129,7 +129,7 @@ std::string EditorController::BuildWindowTitle(const Scene& scene) const
     stream << std::fixed << std::setprecision(2);
     stream << "Renderer Engine - Editing " << selected->Name;
     stream << " | Pos " << selected->TransformData.Position.x << ", " << selected->TransformData.Position.y << ", " << selected->TransformData.Position.z;
-    stream << " | Camera: WASD + Space/C + RMB drag | Object: IJKL/UO move + LMB rotate | TAB select | N add | DEL delete";
+    stream << " | Camera: WASD + Space/C + RMB drag in Viewport | Object: IJKL/UO move + LMB rotate in Viewport";
 
     return stream.str();
 }
