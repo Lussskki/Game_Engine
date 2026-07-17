@@ -16,6 +16,8 @@ public:
     void Bind() const;
     void Unbind() const;
     void SetMat4(const std::string& name, const std::array<float, 16>& value) const;
+    void SetInt(const std::string& name, int value) const;
+    void SetVec3(const std::string& name, float x, float y, float z) const;
 
 private:
     static std::string ReadFile(const std::string& path);
@@ -25,3 +27,4 @@ private:
 };
 
 }
+

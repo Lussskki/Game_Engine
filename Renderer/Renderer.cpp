@@ -19,6 +19,13 @@ bool Renderer::Initialize()
         return false;
     }
 
+    m_GridMesh = std::make_unique<Mesh>();
+    if (!m_GridMesh->CreateGrid(20, 1.0f, -0.72f))
+    {
+        std::cerr << "Failed to create editor grid" << std::endl;
+        return false;
+    }
+
     m_Shader = std::make_unique<Shader>();
     if (!m_Shader->LoadFromFiles("Shaders/basic.vert", "Shaders/basic.frag"))
     {
@@ -36,7 +43,7 @@ bool Renderer::Initialize()
     return true;
 }
 
-void Renderer::UpdateCamera(const Input& input, float deltaTime)
+void Renderer::UpdateCamera(const Input& input, float deltaTime, bool allowMouseLook)
 {
     const float move = m_CameraMoveSpeed * deltaTime;
 
@@ -70,13 +77,24 @@ void Renderer::UpdateCamera(const Input& input, float deltaTime)
         m_Camera.MoveUp(-move);
     }
 
-    if (input.IsMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT))
+    if (allowMouseLook)
     {
         m_Camera.Rotate(
             static_cast<float>(input.GetMouseDeltaX()) * m_MouseLookSpeed,
             static_cast<float>(-input.GetMouseDeltaY()) * m_MouseLookSpeed
         );
     }
+}
+
+void Renderer::ZoomCamera(float amount)
+{
+    m_Camera.MoveForward(amount);
+}
+
+void Renderer::PanCamera(float rightAmount, float upAmount)
+{
+    m_Camera.MoveRight(rightAmount);
+    m_Camera.MoveUp(upAmount);
 }
 
 void Renderer::BeginScreenFrame(int width, int height, float r, float g, float b, float a) const
@@ -93,7 +111,7 @@ void Renderer::RenderSceneToViewport(const Scene& scene, int width, int height)
     m_ViewportFramebuffer->Bind();
 
     glEnable(GL_DEPTH_TEST);
-    glClearColor(0.06f, 0.07f, 0.085f, 1.0f);
+    glClearColor(0.50f, 0.62f, 0.74f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     const float aspectRatio = height > 0 ? static_cast<float>(width) / static_cast<float>(height) : 1.0f;
@@ -113,12 +131,51 @@ void Renderer::DrawScene(const Scene& scene, float aspectRatio) const
 
     m_Shader->Bind();
     m_Shader->SetMat4("u_ViewProjection", viewProjection);
+    m_Shader->SetInt("u_UseSolidColor", 0);
 
-    for (const SceneObject& object : scene.GetObjects())
+    const std::array<float, 16> gridModel = {
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    };
+
+    glLineWidth(1.0f);
+    m_Shader->SetMat4("u_Model", gridModel);
+    m_GridMesh->DrawLines();
+
+    const auto& objects = scene.GetObjects();
+    for (const SceneObject& object : objects)
     {
         m_Shader->SetMat4("u_Model", object.TransformData.GetMatrix());
         m_CubeMesh->Draw();
     }
+
+    const int selectedIndex = scene.GetSelectedIndex();
+    if (selectedIndex < 0 || selectedIndex >= static_cast<int>(objects.size()))
+    {
+        return;
+    }
+
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    glLineWidth(3.0f);
+    glDisable(GL_CULL_FACE);
+    glDepthFunc(GL_LEQUAL);
+
+    m_Shader->SetInt("u_UseSolidColor", 1);
+    m_Shader->SetVec3("u_SolidColor", 1.0f, 0.9f, 0.05f);
+    m_Shader->SetMat4("u_Model", objects[selectedIndex].TransformData.GetMatrix());
+    m_CubeMesh->Draw();
+
+    m_Shader->SetInt("u_UseSolidColor", 0);
+    glLineWidth(1.0f);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glDepthFunc(GL_LESS);
 }
 
 }
+
+
+
+
+

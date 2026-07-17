@@ -12,7 +12,7 @@ public:
     void MoveRight(float amount);
     void MoveUp(float amount);
     void Rotate(float yawDelta, float pitchDelta);
-
+    
     std::array<float, 16> GetViewProjection(float aspectRatio) const;
 
 private:

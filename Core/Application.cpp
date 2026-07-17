@@ -49,23 +49,40 @@ void Application::Run()
         m_Input.Update(m_Window->GetNativeWindow());
         m_Gui.BeginFrame();
 
-        if (m_Input.IsKeyPressed(GLFW_KEY_ESCAPE))
-        {
-            m_Window->RequestClose();
-        }
-
         const bool viewportHovered = m_Gui.IsViewportHovered();
+        const bool cameraToolActive = m_Gui.IsCameraToolSelected();
         const bool cameraLookActive = viewportHovered && m_Input.IsMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT);
-        const bool textInputActive = m_Gui.WantsTextInput();
+        const bool selectToolActive = m_Gui.IsSelectToolSelected();
+        const bool moveToolActive = m_Gui.IsMoveToolSelected();
+        const bool rotateToolActive = m_Gui.IsRotateToolSelected();
+        const bool cameraPanActive = viewportHovered &&
+            (m_Input.IsMouseButtonPressed(GLFW_MOUSE_BUTTON_MIDDLE) ||
+             (selectToolActive && m_Input.IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)));
+        const bool textInputActive = m_Gui.WantsTextInput() || m_Gui.IsEditingText();
+        const bool keyboardCaptured = m_Gui.WantsKeyboardCapture() || textInputActive;
 
         m_Window->SetCursorCaptured(cameraLookActive);
 
-        if (viewportHovered || cameraLookActive)
+        if (viewportHovered)
         {
-            m_Renderer->UpdateCamera(m_Input, deltaTime);
+            m_Renderer->UpdateCamera(m_Input, deltaTime, cameraLookActive);
+
+            if (cameraPanActive)
+            {
+                m_Renderer->PanCamera(
+                    static_cast<float>(-m_Input.GetMouseDeltaX()) * 0.01f,
+                    static_cast<float>(m_Input.GetMouseDeltaY()) * 0.01f
+                );
+            }
+
+            const float wheel = m_Gui.GetMouseWheel();
+            if (wheel != 0.0f && !moveToolActive && !rotateToolActive)
+            {
+                m_Renderer->ZoomCamera(wheel * 0.8f);
+            }
         }
 
-        if (!textInputActive)
+        if (!keyboardCaptured)
         {
             m_Editor.Update(m_Scene, m_Input, deltaTime, viewportHovered);
         }
@@ -89,4 +106,15 @@ void Application::Shutdown()
 }
 
 }
+
+
+
+
+
+
+
+
+
+
+
 

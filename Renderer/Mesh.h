@@ -13,7 +13,9 @@ class Mesh
 {
 public:
     bool CreateCube();
+    bool CreateGrid(int halfSize, float spacing, float yPosition);
     void Draw() const;
+    void DrawLines() const;
 
 private:
     std::unique_ptr<VertexArray> m_VertexArray;
@@ -22,3 +24,4 @@ private:
 };
 
 }
+

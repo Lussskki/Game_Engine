@@ -19,7 +19,9 @@ public:
     ~Renderer() = default;
 
     bool Initialize();
-    void UpdateCamera(const Input& input, float deltaTime);
+    void UpdateCamera(const Input& input, float deltaTime, bool allowMouseLook);
+    void ZoomCamera(float amount);
+    void PanCamera(float rightAmount, float upAmount);
     void BeginScreenFrame(int width, int height, float r, float g, float b, float a) const;
     void RenderSceneToViewport(const Scene& scene, int width, int height);
 
@@ -30,6 +32,7 @@ private:
 
     std::unique_ptr<Shader> m_Shader;
     std::unique_ptr<Mesh> m_CubeMesh;
+    std::unique_ptr<Mesh> m_GridMesh;
     std::unique_ptr<Framebuffer> m_ViewportFramebuffer;
     Camera m_Camera;
     float m_CameraMoveSpeed = 4.0f;
@@ -37,3 +40,7 @@ private:
 };
 
 }
+
+
+
+

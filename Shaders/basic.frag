@@ -3,7 +3,11 @@
 in vec3 v_Color;
 out vec4 FragColor;
 
+uniform int u_UseSolidColor;
+uniform vec3 u_SolidColor;
+
 void main()
 {
-    FragColor = vec4(v_Color, 1.0);
+    vec3 color = u_UseSolidColor == 1 ? u_SolidColor : v_Color;
+    FragColor = vec4(color, 1.0);
 }
