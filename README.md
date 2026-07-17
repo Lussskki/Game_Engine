@@ -8,32 +8,6 @@ A small C++ OpenGL renderer/editor scaffold in `Renderer_Opengl/Engine`.
 
 ![Renderer Engine Editor - Viewport and Gizmos](Screenshots/2.png)
 
-## What We Built
-
-- CMake project setup
-- GLFW window creation and OpenGL context
-- GLEW OpenGL function loading
-- Application main loop
-- Shader loading from files
-- Shader compile/link error logging
-- VAO, VBO, and EBO wrapper classes
-- Mesh class with cube geometry
-- Transform system with position, rotation, and scale
-- Scene system with editable cube objects
-- Perspective camera
-- Framebuffer-based editor viewport
-- Dear ImGui editor interface
-- Scene Hierarchy panel
-- Inspector panel
-- Stats panel
-- Controls panel
-- Toolbar with `Select`, `Move`, `Rotate`, `Scale`, and `Camera`
-- Selected-object yellow outline
-- Unity-like sky/grid viewport environment
-- Move, rotate, and scale visual gizmo guides
-- Mouse-based object editing
-- Mouse-based scene navigation
-
 ## Editor Features
 
 The editor has a basic Dear ImGui layout:
@@ -122,3 +96,4 @@ Renderer_Opengl/Libraries/
 - Add asset browser
 - Add lighting controls
 - Add real 3D transform gizmo picking
+
