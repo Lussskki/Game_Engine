@@ -1,45 +1,48 @@
 ﻿# Renderer Engine
 
-This is a small C++ OpenGL engine/editor scaffold inside `Renderer_Opengl/Engine`.
+A small C++ OpenGL renderer/editor scaffold in `Renderer_Opengl/Engine`.
 
-## Screenshot
+## Screenshots
 
-![Renderer Engine Editor](Screenshots/1.png)
+![Renderer Engine Editor - First View](Screenshots/1.png)
 
-## Done
+![Renderer Engine Editor - Viewport and Gizmos](Screenshots/2.png)
+
+## What We Built
 
 - CMake project setup
-- GLFW window creation
-- OpenGL context creation
+- GLFW window creation and OpenGL context
 - GLEW OpenGL function loading
 - Application main loop
-- OpenGL renderer
 - Shader loading from files
 - Shader compile/link error logging
 - VAO, VBO, and EBO wrapper classes
-- Perspective camera
-- WASD camera movement
-- Right mouse camera look
 - Mesh class with cube geometry
 - Transform system with position, rotation, and scale
 - Scene system with editable cube objects
-- Keyboard and mouse editor controls
-- Dear ImGui integrated from `Renderer_Opengl/Libraries/imgui`
-- GUI menu bar
+- Perspective camera
+- Framebuffer-based editor viewport
+- Dear ImGui editor interface
 - Scene Hierarchy panel
 - Inspector panel
 - Stats panel
 - Controls panel
+- Toolbar with `Select`, `Move`, `Rotate`, `Scale`, and `Camera`
+- Selected-object yellow outline
+- Unity-like sky/grid viewport environment
+- Move, rotate, and scale visual gizmo guides
+- Mouse-based object editing
+- Mouse-based scene navigation
 
-## GUI
+## Editor Features
 
-The engine now has a basic Dear ImGui editor interface.
-
-Current GUI panels:
+The editor has a basic Dear ImGui layout:
 
 - `File` menu
 - `View` menu
+- `Toolbar`
 - `Scene Hierarchy`
+- `Viewport`
 - `Inspector`
 - `Stats`
 - `Controls`
@@ -48,30 +51,33 @@ The `Scene Hierarchy` lets you select objects and add/delete cubes.
 
 The `Inspector` lets you edit the selected cube name, position, rotation, and scale.
 
-The `Stats` panel shows FPS and frame time.
+The `Viewport` renders the OpenGL scene into a framebuffer texture and displays it inside ImGui.
 
-## Camera Controls
+## Viewport Controls
 
-- `W`: move camera forward
-- `S`: move camera backward
-- `A`: move camera left
-- `D`: move camera right
-- `Space`: move camera up
-- `C`: move camera down
-- Hold right mouse button and drag: look around
+- Hold right mouse and move mouse: look around scene camera
+- Hold right mouse + `W/A/S/D`: fly camera
+- Hold right mouse + `Space/C`: move camera up/down
+- Middle mouse drag: pan scene
+- Mouse wheel: zoom camera
 
-## Object Editor Controls
+## Toolbar Tools
 
-- `TAB`: select next cube
-- `SHIFT + TAB`: select previous cube
-- `N`: add cube
-- `DELETE`: delete selected cube
-- `I/J/K/L`: move selected cube on X/Y
-- `U/O`: move selected cube forward/back in depth
-- Hold left mouse button and drag: rotate selected cube
-- Arrow keys: rotate selected cube
-- `Z/X`: scale selected cube down/up
-- `ESC`: close window
+- `Select`: left mouse drag pans scene
+- `Move`: left mouse drag moves selected object on X/Y
+- `Move`: mouse wheel moves selected object on Z depth
+- `Rotate`: left mouse drag rotates selected object on X/Y
+- `Rotate`: mouse wheel rotates selected object on Z roll
+- `Scale`: left mouse drag scales selected object
+- `Camera`: viewport camera navigation mode
+
+## Visual Editor Helpers
+
+- Yellow outline shows the selected object
+- Move tool shows red/green/blue axis directions
+- Rotate tool shows a circular guide
+- Scale tool shows scale handles
+- Viewport uses a sky-colored background and ground grid
 
 ## Build
 
@@ -108,14 +114,11 @@ Renderer_Opengl/Libraries/
 
 ## Next Steps
 
-- Add a proper viewport panel using a framebuffer
 - Add texture loading with `stb_image`
 - Add material system
 - Add model loading with Assimp
 - Add scene save/load
-- Add transform gizmos
 - Add console/log panel
 - Add asset browser
 - Add lighting controls
-
-
+- Add real 3D transform gizmo picking
