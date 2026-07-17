@@ -15,6 +15,7 @@ find_package(OpenGL REQUIRED)
 
 add_library(RendererEngine STATIC
     Core/Application.cpp
+    Core/ConsoleLog.cpp
     Editor/EditorController.cpp
     Editor/EditorGui.cpp
     Input/Input.cpp
@@ -22,8 +23,10 @@ add_library(RendererEngine STATIC
     Renderer/Camera.cpp
     Renderer/Framebuffer.cpp
     Renderer/Mesh.cpp
+    Renderer/ModelLoader.cpp
     Renderer/Renderer.cpp
     Renderer/Shader.cpp
+    Renderer/Texture.cpp
     Renderer/VertexArray.cpp
     Renderer/VertexBuffer.cpp
     Renderer/IndexBuffer.cpp
@@ -95,3 +98,4 @@ if(MSVC)
             $<TARGET_FILE_DIR:Sandbox>/glfw3.dll
     )
 endif()
+

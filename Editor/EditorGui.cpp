@@ -1,8 +1,11 @@
 ﻿#include "Editor/EditorGui.h"
 
+#include "Core/ConsoleLog.h"
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
@@ -55,7 +58,7 @@ void EditorGui::BeginFrame()
     ImGui::NewFrame();
 }
 
-void EditorGui::Draw(Scene& scene, float deltaTime, unsigned int viewportTextureId)
+void EditorGui::Draw(Scene& scene, Renderer& renderer, float deltaTime, unsigned int viewportTextureId)
 {
     m_EditingText = false;
 
@@ -66,9 +69,11 @@ void EditorGui::Draw(Scene& scene, float deltaTime, unsigned int viewportTexture
     DrawHierarchy(scene);
     DrawInspector(scene);
     DrawStats(deltaTime);
+    DrawLighting(renderer);
+    DrawAssetBrowser();
+    DrawConsole();
     DrawControls();
 }
-
 void EditorGui::EndFrame()
 {
     ImGui::Render();
@@ -114,6 +119,7 @@ void EditorGui::DrawMenuBar(Scene& scene)
             if (ImGui::MenuItem("Delete Selected", "Del"))
             {
                 scene.DeleteSelected();
+                ConsoleLog::Info("Deleted selected object");
             }
 
             ImGui::EndMenu();
@@ -382,6 +388,73 @@ void EditorGui::DrawStats(float deltaTime)
     ImGui::End();
 }
 
+void EditorGui::DrawLighting(Renderer& renderer)
+{
+    ImGui::SetNextWindowPos(ImVec2(980.0f, 405.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(290.0f, 170.0f), ImGuiCond_FirstUseEver);
+
+    ImGui::Begin("Lighting");
+
+    LightingSettings& lighting = renderer.GetLightingSettings();
+    ImGui::DragFloat("Ambient", &lighting.AmbientStrength, 0.01f, 0.0f, 1.0f);
+    ImGui::DragFloat("Intensity", &lighting.Intensity, 0.01f, 0.0f, 3.0f);
+    ImGui::DragFloat3("Direction", &lighting.DirectionX, 0.02f, -1.0f, 1.0f);
+
+    ImGui::End();
+}
+
+void EditorGui::DrawAssetBrowser()
+{
+    ImGui::SetNextWindowPos(ImVec2(405.0f, 615.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(555.0f, 130.0f), ImGuiCond_FirstUseEver);
+
+    ImGui::Begin("Asset Browser");
+
+    const char* roots[] = {"Assets", "Shaders", "Screenshots", "Scenes"};
+    for (const char* root : roots)
+    {
+        if (ImGui::TreeNode(root))
+        {
+            if (std::filesystem::exists(root))
+            {
+                for (const auto& entry : std::filesystem::directory_iterator(root))
+                {
+                    ImGui::TextUnformatted(entry.path().filename().string().c_str());
+                }
+            }
+            else
+            {
+                ImGui::TextDisabled("Folder missing");
+            }
+
+            ImGui::TreePop();
+        }
+    }
+
+    ImGui::End();
+}
+
+void EditorGui::DrawConsole()
+{
+    ImGui::SetNextWindowPos(ImVec2(405.0f, 750.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(555.0f, 160.0f), ImGuiCond_FirstUseEver);
+
+    ImGui::Begin("Console");
+
+    if (ImGui::Button("Clear"))
+    {
+        ConsoleLog::Clear();
+    }
+
+    ImGui::Separator();
+
+    for (const std::string& message : ConsoleLog::GetMessages())
+    {
+        ImGui::TextWrapped("%s", message.c_str());
+    }
+
+    ImGui::End();
+}
 void EditorGui::DrawControls()
 {
     ImGui::SetNextWindowPos(ImVec2(10.0f, 490.0f), ImGuiCond_FirstUseEver);
@@ -464,6 +537,9 @@ void EditorGui::HandleViewportMouse(Scene& scene)
 }
 
 }
+
+
+
 
 
 

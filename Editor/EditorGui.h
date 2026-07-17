@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "Renderer/Renderer.h"
 #include "Scene/Scene.h"
 
 #include <array>
@@ -25,7 +26,7 @@ public:
     void Shutdown();
 
     void BeginFrame();
-    void Draw(Scene& scene, float deltaTime, unsigned int viewportTextureId);
+    void Draw(Scene& scene, Renderer& renderer, float deltaTime, unsigned int viewportTextureId);
     void EndFrame();
 
     bool WantsMouseCapture() const;
@@ -81,6 +82,9 @@ private:
     void DrawHierarchy(Scene& scene);
     void DrawInspector(Scene& scene);
     void DrawStats(float deltaTime);
+    void DrawConsole();
+    void DrawAssetBrowser();
+    void DrawLighting(Renderer& renderer);
     void DrawControls();
     void DrawToolbar();
     void HandleViewportMouse(Scene& scene);
@@ -98,6 +102,8 @@ private:
 };
 
 }
+
+
 
 
 

@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "Renderer/Material.h"
 #include "Scene/Transform.h"
 
 #include <string>
@@ -12,6 +13,7 @@ struct SceneObject
 {
     std::string Name;
     Transform TransformData;
+    Material MaterialData;
 };
 
 class Scene
@@ -24,6 +26,8 @@ public:
     void SelectNext();
     void SelectPrevious();
     void Select(int index);
+    bool SaveToFile(const std::string& path) const;
+    bool LoadFromFile(const std::string& path);
 
     SceneObject* GetSelectedObject();
     const SceneObject* GetSelectedObject() const;

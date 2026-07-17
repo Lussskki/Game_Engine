@@ -125,6 +125,11 @@ unsigned int Renderer::GetViewportTextureId() const
     return m_ViewportFramebuffer->GetColorTextureId();
 }
 
+LightingSettings& Renderer::GetLightingSettings()
+{
+    return m_Lighting;
+}
+
 void Renderer::DrawScene(const Scene& scene, float aspectRatio) const
 {
     const auto viewProjection = m_Camera.GetViewProjection(aspectRatio);
@@ -132,6 +137,9 @@ void Renderer::DrawScene(const Scene& scene, float aspectRatio) const
     m_Shader->Bind();
     m_Shader->SetMat4("u_ViewProjection", viewProjection);
     m_Shader->SetInt("u_UseSolidColor", 0);
+    m_Shader->SetVec3("u_LightDirection", m_Lighting.DirectionX, m_Lighting.DirectionY, m_Lighting.DirectionZ);
+    m_Shader->SetFloat("u_AmbientStrength", m_Lighting.AmbientStrength);
+    m_Shader->SetFloat("u_LightIntensity", m_Lighting.Intensity);
 
     const std::array<float, 16> gridModel = {
         1.0f, 0.0f, 0.0f, 0.0f,
@@ -148,6 +156,7 @@ void Renderer::DrawScene(const Scene& scene, float aspectRatio) const
     for (const SceneObject& object : objects)
     {
         m_Shader->SetMat4("u_Model", object.TransformData.GetMatrix());
+        m_Shader->SetVec3("u_MaterialColor", object.MaterialData.Albedo.x, object.MaterialData.Albedo.y, object.MaterialData.Albedo.z);
         m_CubeMesh->Draw();
     }
 
@@ -174,6 +183,9 @@ void Renderer::DrawScene(const Scene& scene, float aspectRatio) const
 }
 
 }
+
+
+
 
 
 

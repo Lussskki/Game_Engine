@@ -20,6 +20,11 @@ A small C++ OpenGL renderer/editor scaffold in `Renderer_Opengl/Engine`.
 - Move, rotate, and scale tool guides
 - Mouse camera navigation
 - Mouse-based object movement, rotation, and scale
+- Material color controls
+- Scene save/load
+- Console/log panel
+- Asset browser panel
+- Lighting controls
 ## Editor Features
 
 The editor has a basic Dear ImGui layout:
@@ -31,11 +36,14 @@ The editor has a basic Dear ImGui layout:
 - `Viewport`
 - `Inspector`
 - `Stats`
+- `Lighting`
+- `Asset Browser`
+- `Console`
 - `Controls`
 
 The `Scene Hierarchy` lets you select objects and add/delete cubes.
 
-The `Inspector` lets you edit the selected cube name, position, rotation, and scale.
+The `Inspector` lets you edit the selected cube name, position, rotation, scale, and material color.
 
 The `Viewport` renders the OpenGL scene into a framebuffer texture and displays it inside ImGui.
 
@@ -98,15 +106,17 @@ Renderer_Opengl/Libraries/
   imgui/
 ```
 
-## Next Steps
+## Feature Status
 
-- Add texture loading with `stb_image`
-- Add material system
-- Add model loading with Assimp
-- Add scene save/load
-- Add console/log panel
-- Add asset browser
-- Add lighting controls
-- Add real 3D transform gizmo picking
+- Done: material color system
+- Done: scene save/load through `Scenes/default.scene`
+- Done: console/log panel
+- Done: asset browser panel
+- Done: lighting controls
+- Added groundwork: texture class and checkerboard texture support
+- Blocked by dependency: full image texture loading needs `stb_image`
+- Blocked by dependency: model loading needs Assimp installed, for example `pacman -S mingw-w64-ucrt-x86_64-assimp`
+- Next: real 3D transform gizmo picking
+
 
 

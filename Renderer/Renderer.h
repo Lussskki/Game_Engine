@@ -12,6 +12,15 @@
 namespace Engine
 {
 
+struct LightingSettings
+{
+    float AmbientStrength = 0.35f;
+    float DirectionX = -0.4f;
+    float DirectionY = -1.0f;
+    float DirectionZ = -0.3f;
+    float Intensity = 0.75f;
+};
+
 class Renderer
 {
 public:
@@ -26,6 +35,7 @@ public:
     void RenderSceneToViewport(const Scene& scene, int width, int height);
 
     unsigned int GetViewportTextureId() const;
+    LightingSettings& GetLightingSettings();
 
 private:
     void DrawScene(const Scene& scene, float aspectRatio) const;
@@ -37,9 +47,12 @@ private:
     Camera m_Camera;
     float m_CameraMoveSpeed = 4.0f;
     float m_MouseLookSpeed = 0.0035f;
+    LightingSettings m_Lighting;
 };
 
 }
+
+
 
 
 

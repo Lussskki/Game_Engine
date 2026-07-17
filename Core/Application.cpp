@@ -90,7 +90,7 @@ void Application::Run()
         m_Renderer->RenderSceneToViewport(m_Scene, m_Gui.GetViewportWidth(), m_Gui.GetViewportHeight());
         m_Renderer->BeginScreenFrame(m_Window->GetWidth(), m_Window->GetHeight(), 0.035f, 0.038f, 0.045f, 1.0f);
 
-        m_Gui.Draw(m_Scene, deltaTime, m_Renderer->GetViewportTextureId());
+        m_Gui.Draw(m_Scene, *m_Renderer, deltaTime, m_Renderer->GetViewportTextureId());
         m_Gui.EndFrame();
 
         m_Window->SwapBuffers();
@@ -106,6 +106,7 @@ void Application::Shutdown()
 }
 
 }
+
 
 
 
