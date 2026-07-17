@@ -1,12 +1,30 @@
-﻿build/
-.vs/
+﻿# Build output
+build/
+build-desktop/
 out/
-*.obj
-*.o
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+
+# Ninja generated files
+.ninja_deps
+.ninja_log
+
+# Binaries and libraries
 *.exe
 *.dll
-*.a
 *.lib
+*.a
+*.obj
+*.o
 *.pdb
 *.ilk
 *.log
+
+# Editor/user local files
+*.user
+.vs/
+.vscode/ipch/
