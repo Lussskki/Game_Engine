@@ -7,7 +7,19 @@ A small C++ OpenGL renderer/editor scaffold in `Renderer_Opengl/Engine`.
 ![Renderer Engine Editor - First View](Screenshots/1.png)
 
 ![Renderer Engine Editor - Viewport and Gizmos](Screenshots/2.png)
+## What Is Added
 
+- OpenGL renderer/editor scaffold
+- Dear ImGui editor UI
+- Framebuffer viewport inside the editor
+- Scene Hierarchy and Inspector panels
+- Editable cube objects
+- Selected-object outline
+- Sky-colored viewport background
+- Ground grid
+- Move, rotate, and scale tool guides
+- Mouse camera navigation
+- Mouse-based object movement, rotation, and scale
 ## Editor Features
 
 The editor has a basic Dear ImGui layout:
@@ -96,4 +108,5 @@ Renderer_Opengl/Libraries/
 - Add asset browser
 - Add lighting controls
 - Add real 3D transform gizmo picking
+
 
