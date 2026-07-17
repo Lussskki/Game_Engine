@@ -23,7 +23,6 @@ A small C++ OpenGL renderer/editor scaffold in `Renderer_Opengl/Engine`.
 - Material color controls
 - Scene save/load
 - Console/log panel
-- Asset browser panel
 - Lighting controls
 ## Editor Features
 
@@ -37,7 +36,6 @@ The editor has a basic Dear ImGui layout:
 - `Inspector`
 - `Stats`
 - `Lighting`
-- `Asset Browser`
 - `Console`
 - `Controls`
 
@@ -111,12 +109,12 @@ Renderer_Opengl/Libraries/
 - Done: material color system
 - Done: scene save/load through `Scenes/default.scene`
 - Done: console/log panel
-- Done: asset browser panel
 - Done: lighting controls
 - Added groundwork: texture class and checkerboard texture support
 - Blocked by dependency: full image texture loading needs `stb_image`
 - Blocked by dependency: model loading needs Assimp installed, for example `pacman -S mingw-w64-ucrt-x86_64-assimp`
 - Next: real 3D transform gizmo picking
+
 
 
 

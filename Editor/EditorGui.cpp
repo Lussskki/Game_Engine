@@ -70,7 +70,6 @@ void EditorGui::Draw(Scene& scene, Renderer& renderer, float deltaTime, unsigned
     DrawInspector(scene);
     DrawStats(deltaTime);
     DrawLighting(renderer);
-    DrawAssetBrowser();
     DrawConsole();
     DrawControls();
 }
@@ -403,37 +402,6 @@ void EditorGui::DrawLighting(Renderer& renderer)
     ImGui::End();
 }
 
-void EditorGui::DrawAssetBrowser()
-{
-    ImGui::SetNextWindowPos(ImVec2(405.0f, 615.0f), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(555.0f, 130.0f), ImGuiCond_FirstUseEver);
-
-    ImGui::Begin("Asset Browser");
-
-    const char* roots[] = {"Assets", "Shaders", "Screenshots", "Scenes"};
-    for (const char* root : roots)
-    {
-        if (ImGui::TreeNode(root))
-        {
-            if (std::filesystem::exists(root))
-            {
-                for (const auto& entry : std::filesystem::directory_iterator(root))
-                {
-                    ImGui::TextUnformatted(entry.path().filename().string().c_str());
-                }
-            }
-            else
-            {
-                ImGui::TextDisabled("Folder missing");
-            }
-
-            ImGui::TreePop();
-        }
-    }
-
-    ImGui::End();
-}
-
 void EditorGui::DrawConsole()
 {
     ImGui::SetNextWindowPos(ImVec2(405.0f, 750.0f), ImGuiCond_FirstUseEver);
@@ -537,6 +505,7 @@ void EditorGui::HandleViewportMouse(Scene& scene)
 }
 
 }
+
 
 
 
