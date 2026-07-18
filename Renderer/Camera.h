@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include <array>
 
@@ -14,6 +14,8 @@ public:
     void Rotate(float yawDelta, float pitchDelta);
     
     std::array<float, 16> GetViewProjection(float aspectRatio) const;
+    float GetPitch() const;
+    float GetYaw() const;
 
 private:
     struct Vector3

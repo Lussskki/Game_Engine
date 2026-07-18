@@ -10,6 +10,7 @@ uniform vec3 u_MaterialColor;
 uniform vec3 u_LightDirection;
 uniform float u_AmbientStrength;
 uniform float u_LightIntensity;
+uniform float u_Alpha;
 
 void main()
 {
@@ -19,5 +20,5 @@ void main()
     vec3 baseColor = v_Color * u_MaterialColor;
     vec3 litColor = baseColor * (u_AmbientStrength + diffuse);
     vec3 color = u_UseSolidColor == 1 ? u_SolidColor : litColor;
-    FragColor = vec4(color, 1.0);
+    FragColor = vec4(color, u_Alpha);
 }

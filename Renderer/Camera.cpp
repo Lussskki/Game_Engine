@@ -1,4 +1,4 @@
-﻿#include "Renderer/Camera.h"
+#include "Renderer/Camera.h"
 
 #include <algorithm>
 #include <cmath>
@@ -47,6 +47,16 @@ std::array<float, 16> Camera::GetViewProjection(float aspectRatio) const
     const auto view = LookAt(m_Position, target, {0.0f, 1.0f, 0.0f});
 
     return Multiply(projection, view);
+}
+
+float Camera::GetPitch() const
+{
+    return m_Pitch;
+}
+
+float Camera::GetYaw() const
+{
+    return m_Yaw;
 }
 
 Camera::Vector3 Camera::GetForward() const

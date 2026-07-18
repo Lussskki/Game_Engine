@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Renderer/Renderer.h"
 #include "Scene/Scene.h"
@@ -16,6 +16,14 @@ enum class EditorTool
     Rotate,
     Scale,
     Camera
+};
+
+enum class EditorAxis
+{
+    None,
+    X,
+    Y,
+    Z
 };    
 
 
@@ -78,30 +86,34 @@ public:
 
 private:
     void DrawMenuBar(Scene& scene);
-    void DrawViewport(unsigned int viewportTextureId);
+    void DrawViewport(Scene& scene, Renderer& renderer, unsigned int viewportTextureId);
     void DrawHierarchy(Scene& scene);
     void DrawInspector(Scene& scene);
     void DrawStats(float deltaTime);
     void DrawConsole();
-    void DrawAssetBrowser();
     void DrawLighting(Renderer& renderer);
     void DrawControls();
     void DrawToolbar();
-    void HandleViewportMouse(Scene& scene);
+    void HandleViewportMouse(Scene& scene, Renderer& renderer);
 
 
     EditorTool m_CurrentTool = EditorTool::Select;
+    EditorAxis m_ActiveMoveAxis = EditorAxis::None;
     bool m_Initialized = false;
     bool m_ViewportHovered = false;
     bool m_ViewportFocused = false;
     bool m_EditingText = false;
     int m_ViewportWidth = 900;
     int m_ViewportHeight = 600;
+    float m_ViewportImageMinX = 0.0f;
+    float m_ViewportImageMinY = 0.0f;
     int m_NameEditIndex = -1;
     std::array<char, 128> m_NameBuffer = {};
 };
 
 }
+
+
 
 
 

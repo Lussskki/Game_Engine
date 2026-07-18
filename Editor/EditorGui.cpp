@@ -1,4 +1,4 @@
-﻿#include "Editor/EditorGui.h"
+#include "Editor/EditorGui.h"
 
 #include "Core/ConsoleLog.h"
 
@@ -64,8 +64,8 @@ void EditorGui::Draw(Scene& scene, Renderer& renderer, float deltaTime, unsigned
 
     DrawMenuBar(scene);
     DrawToolbar();
-    DrawViewport(viewportTextureId);
-    HandleViewportMouse(scene);
+    DrawViewport(scene, renderer, viewportTextureId);
+    HandleViewportMouse(scene, renderer);
     DrawHierarchy(scene);
     DrawInspector(scene);
     DrawStats(deltaTime);
@@ -113,6 +113,16 @@ void EditorGui::DrawMenuBar(Scene& scene)
             if (ImGui::MenuItem("New Cube", "N"))
             {
                 scene.AddCube();
+            }
+
+            if (ImGui::MenuItem("New Terrain"))
+            {
+                scene.AddTerrain();
+            }
+
+            if (ImGui::MenuItem("New Wall"))
+            {
+                scene.AddTerrainWall();
             }
 
             if (ImGui::MenuItem("Delete Selected", "Del"))
@@ -188,7 +198,7 @@ void EditorGui::DrawToolbar()
     ImGui::End();
 }
 
-void EditorGui::DrawViewport(unsigned int viewportTextureId)
+void EditorGui::DrawViewport(Scene& scene, Renderer& renderer, unsigned int viewportTextureId)
 {
     ImGui::SetNextWindowPos(ImVec2(285.0f, 85.0f), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(680.0f, 520.0f), ImGuiCond_FirstUseEver);
@@ -215,7 +225,21 @@ void EditorGui::DrawViewport(unsigned int viewportTextureId)
 
         const ImVec2 min = ImGui::GetItemRectMin();
         const ImVec2 max = ImGui::GetItemRectMax();
-        const ImVec2 center((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
+        m_ViewportImageMinX = min.x;
+        m_ViewportImageMinY = min.y;
+
+        ImVec2 center((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
+        const SceneObject* selectedObject = scene.GetSelectedObject();
+        if (selectedObject)
+        {
+            float projectedX = 0.0f;
+            float projectedY = 0.0f;
+            if (renderer.ProjectWorldToViewport(selectedObject->TransformData.Position, m_ViewportWidth, m_ViewportHeight, projectedX, projectedY))
+            {
+                center = ImVec2(min.x + projectedX, min.y + projectedY);
+            }
+        }
+
         const float radius = available.x < available.y ? available.x * 0.18f : available.y * 0.18f;
         ImDrawList* drawList = ImGui::GetWindowDrawList();
 
@@ -236,9 +260,9 @@ void EditorGui::DrawViewport(unsigned int viewportTextureId)
             const ImVec2 zEnd(center.x + radius * 0.65f, center.y - radius * 0.65f);
 
             drawList->AddCircleFilled(center, 4.0f, yellow, 16);
-            drawList->AddLine(center, right, red, 3.0f);
-            drawList->AddLine(center, up, green, 3.0f);
-            drawList->AddLine(center, zEnd, blue, 3.0f);
+            drawList->AddLine(center, right, m_ActiveMoveAxis == EditorAxis::X ? yellow : red, m_ActiveMoveAxis == EditorAxis::X ? 5.0f : 3.0f);
+            drawList->AddLine(center, up, m_ActiveMoveAxis == EditorAxis::Y ? yellow : green, m_ActiveMoveAxis == EditorAxis::Y ? 5.0f : 3.0f);
+            drawList->AddLine(center, zEnd, m_ActiveMoveAxis == EditorAxis::Z ? yellow : blue, m_ActiveMoveAxis == EditorAxis::Z ? 5.0f : 3.0f);
 
             drawList->AddTriangleFilled(right, ImVec2(right.x - arrow, right.y - arrow * 0.65f), ImVec2(right.x - arrow, right.y + arrow * 0.65f), red);
             drawList->AddTriangleFilled(up, ImVec2(up.x - arrow * 0.65f, up.y + arrow), ImVec2(up.x + arrow * 0.65f, up.y + arrow), green);
@@ -270,14 +294,66 @@ void EditorGui::DrawViewport(unsigned int viewportTextureId)
 
         if (m_CurrentTool == EditorTool::Scale)
         {
-            drawList->AddRect(ImVec2(center.x - radius * 0.45f, center.y - radius * 0.45f), ImVec2(center.x + radius * 0.45f, center.y + radius * 0.45f), yellow, 0.0f, 0, 2.5f);
-            drawList->AddLine(center, right, red, 3.0f);
-            drawList->AddLine(center, up, green, 3.0f);
-            drawList->AddLine(center, ImVec2(center.x + radius * 0.6f, center.y - radius * 0.6f), blue, 3.0f);
-            drawList->AddRectFilled(ImVec2(right.x - 5.0f, right.y - 5.0f), ImVec2(right.x + 5.0f, right.y + 5.0f), red);
-            drawList->AddRectFilled(ImVec2(up.x - 5.0f, up.y - 5.0f), ImVec2(up.x + 5.0f, up.y + 5.0f), green);
-            drawList->AddRectFilled(ImVec2(center.x + radius * 0.6f - 5.0f, center.y - radius * 0.6f - 5.0f), ImVec2(center.x + radius * 0.6f + 5.0f, center.y - radius * 0.6f + 5.0f), blue);
-            drawList->AddText(ImVec2(center.x - 24.0f, center.y - 8.0f), white, "Scale");
+            if (selectedObject && (selectedObject->Type == SceneObjectType::Terrain || selectedObject->Type == SceneObjectType::TerrainWall))
+            {
+                const float halfSize = 10.0f;
+                const Vec3 localCorners[] = {
+                    {-halfSize, 0.0f, -halfSize},
+                    { halfSize, 0.0f, -halfSize},
+                    { halfSize, 0.0f,  halfSize},
+                    {-halfSize, 0.0f,  halfSize}
+                };
+                const auto model = selectedObject->TransformData.GetMatrix();
+                Vec3 worldCorners[4];
+                for (int cornerIndex = 0; cornerIndex < 4; cornerIndex++)
+                {
+                    const Vec3& local = localCorners[cornerIndex];
+                    worldCorners[cornerIndex] = {
+                        model[0] * local.x + model[4] * local.y + model[8] * local.z + model[12],
+                        model[1] * local.x + model[5] * local.y + model[9] * local.z + model[13],
+                        model[2] * local.x + model[6] * local.y + model[10] * local.z + model[14]
+                    };
+                }
+
+                ImVec2 projectedCorners[4];
+                bool allVisible = true;
+                for (int cornerIndex = 0; cornerIndex < 4; cornerIndex++)
+                {
+                    float projectedX = 0.0f;
+                    float projectedY = 0.0f;
+                    if (!renderer.ProjectWorldToViewport(worldCorners[cornerIndex], m_ViewportWidth, m_ViewportHeight, projectedX, projectedY))
+                    {
+                        allVisible = false;
+                        break;
+                    }
+
+                    projectedCorners[cornerIndex] = ImVec2(min.x + projectedX, min.y + projectedY);
+                }
+
+                if (allVisible)
+                {
+                    for (int cornerIndex = 0; cornerIndex < 4; cornerIndex++)
+                    {
+                        const ImVec2 start = projectedCorners[cornerIndex];
+                        const ImVec2 end = projectedCorners[(cornerIndex + 1) % 4];
+                        drawList->AddLine(start, end, yellow, 3.0f);
+                        drawList->AddRectFilled(ImVec2(start.x - 6.0f, start.y - 6.0f), ImVec2(start.x + 6.0f, start.y + 6.0f), yellow);
+                    }
+                }
+
+                drawList->AddText(ImVec2(center.x + 12.0f, center.y - 8.0f), white, selectedObject->Type == SceneObjectType::TerrainWall ? "Resize Wall" : "Resize Terrain");
+            }
+            else
+            {
+                drawList->AddRect(ImVec2(center.x - radius * 0.45f, center.y - radius * 0.45f), ImVec2(center.x + radius * 0.45f, center.y + radius * 0.45f), yellow, 0.0f, 0, 2.5f);
+                drawList->AddLine(center, right, red, 3.0f);
+                drawList->AddLine(center, up, green, 3.0f);
+                drawList->AddLine(center, ImVec2(center.x + radius * 0.6f, center.y - radius * 0.6f), blue, 3.0f);
+                drawList->AddRectFilled(ImVec2(right.x - 5.0f, right.y - 5.0f), ImVec2(right.x + 5.0f, right.y + 5.0f), red);
+                drawList->AddRectFilled(ImVec2(up.x - 5.0f, up.y - 5.0f), ImVec2(up.x + 5.0f, up.y + 5.0f), green);
+                drawList->AddRectFilled(ImVec2(center.x + radius * 0.6f - 5.0f, center.y - radius * 0.6f - 5.0f), ImVec2(center.x + radius * 0.6f + 5.0f, center.y - radius * 0.6f + 5.0f), blue);
+                drawList->AddText(ImVec2(center.x - 24.0f, center.y - 8.0f), white, "Scale");
+            }
         }
     }
 
@@ -294,6 +370,20 @@ void EditorGui::DrawHierarchy(Scene& scene)
     if (ImGui::Button("Add Cube"))
     {
         scene.AddCube();
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::Button("Add Terrain"))
+    {
+        scene.AddTerrain();
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::Button("Add Wall"))
+    {
+        scene.AddTerrainWall();
     }
 
     ImGui::SameLine();
@@ -363,9 +453,111 @@ void EditorGui::DrawInspector(Scene& scene)
 
     ImGui::Separator();
 
+    const char* typeText = "Cube";
+    if (selected->Type == SceneObjectType::TerrainWall)
+    {
+        typeText = "Terrain Wall";
+    }
+    else if (selected->Type == SceneObjectType::Terrain)
+    {
+        typeText = "Terrain";
+    }
+    ImGui::Text("Type: %s", typeText);
+
+    int collisionIndex = 0;
+    if (selected->CollisionShape == CollisionShapeType::Box)
+    {
+        collisionIndex = 1;
+    }
+    else if (selected->CollisionShape == CollisionShapeType::Terrain)
+    {
+        collisionIndex = 2;
+    }
+    else if (selected->CollisionShape == CollisionShapeType::Wall)
+    {
+        collisionIndex = 3;
+    }
+
+    const char* collisionItems[] = {"None", "Box", "Terrain", "Wall"};
+    if (ImGui::Combo("Collision Shape", &collisionIndex, collisionItems, 4))
+    {
+        if (collisionIndex == 1)
+        {
+            selected->CollisionShape = CollisionShapeType::Box;
+        }
+        else if (collisionIndex == 2)
+        {
+            selected->CollisionShape = CollisionShapeType::Terrain;
+        }
+        else if (collisionIndex == 3)
+        {
+            selected->CollisionShape = CollisionShapeType::Wall;
+        }
+        else
+        {
+            selected->CollisionShape = CollisionShapeType::None;
+        }
+    }
+
+    ImGui::Separator();
+
     ImGui::DragFloat3("Position", &selected->TransformData.Position.x, 0.05f);
     ImGui::DragFloat3("Rotation", &selected->TransformData.Rotation.x, 0.02f);
-    ImGui::DragFloat3("Scale", &selected->TransformData.Scale.x, 0.02f, 0.1f, 10.0f);
+
+    if (selected->Type == SceneObjectType::TerrainWall)
+    {
+        ImGui::TextUnformatted("Wall Direction");
+        int wallDirection = selected->TransformData.Rotation.z > 1.0f ? 1 : 0;
+        const int previousWallDirection = wallDirection;
+        const char* wallDirectionItems[] = {"Across X", "Across Z"};
+        if (ImGui::Combo("##WallDirection", &wallDirection, wallDirectionItems, 2))
+        {
+            const float oldWidth = previousWallDirection == 0 ? selected->TransformData.Scale.x : selected->TransformData.Scale.z;
+            const float oldHeight = previousWallDirection == 0 ? selected->TransformData.Scale.z : selected->TransformData.Scale.x;
+
+            if (wallDirection == 0)
+            {
+                selected->TransformData.Rotation.x = 1.57079632679f;
+                selected->TransformData.Rotation.y = 0.0f;
+                selected->TransformData.Rotation.z = 0.0f;
+                selected->TransformData.Scale.x = oldWidth;
+                selected->TransformData.Scale.z = oldHeight;
+            }
+            else
+            {
+                selected->TransformData.Rotation.x = 0.0f;
+                selected->TransformData.Rotation.y = 0.0f;
+                selected->TransformData.Rotation.z = 1.57079632679f;
+                selected->TransformData.Scale.x = oldHeight;
+                selected->TransformData.Scale.z = oldWidth;
+            }
+        }
+
+        ImGui::TextUnformatted("Wall Size");
+        if (wallDirection == 0)
+        {
+            ImGui::DragFloat("Width X", &selected->TransformData.Scale.x, 0.05f, 0.25f, 20.0f);
+            ImGui::DragFloat("Height Y", &selected->TransformData.Scale.z, 0.05f, 0.25f, 20.0f);
+        }
+        else
+        {
+            ImGui::DragFloat("Width Z", &selected->TransformData.Scale.z, 0.05f, 0.25f, 20.0f);
+            ImGui::DragFloat("Height Y", &selected->TransformData.Scale.x, 0.05f, 0.25f, 20.0f);
+        }
+
+        selected->TransformData.Scale.y = 1.0f;
+    }
+    else if (selected->Type == SceneObjectType::Terrain)
+    {
+        ImGui::TextUnformatted("Terrain Size");
+        ImGui::DragFloat("Width", &selected->TransformData.Scale.x, 0.05f, 0.25f, 20.0f);
+        ImGui::DragFloat("Depth", &selected->TransformData.Scale.z, 0.05f, 0.25f, 20.0f);
+        selected->TransformData.Scale.y = 1.0f;
+    }
+    else
+    {
+        ImGui::DragFloat3("Scale", &selected->TransformData.Scale.x, 0.02f, 0.1f, 10.0f);
+    }
 
     ImGui::End();
 }
@@ -395,9 +587,27 @@ void EditorGui::DrawLighting(Renderer& renderer)
     ImGui::Begin("Lighting");
 
     LightingSettings& lighting = renderer.GetLightingSettings();
-    ImGui::DragFloat("Ambient", &lighting.AmbientStrength, 0.01f, 0.0f, 1.0f);
-    ImGui::DragFloat("Intensity", &lighting.Intensity, 0.01f, 0.0f, 3.0f);
-    ImGui::DragFloat3("Direction", &lighting.DirectionX, 0.02f, -1.0f, 1.0f);
+
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.16f, 0.06f, 0.06f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.30f, 0.08f, 0.08f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.42f, 0.08f, 0.08f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.95f, 0.12f, 0.10f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(1.0f, 0.30f, 0.22f, 1.0f));
+
+    ImGui::TextUnformatted("Ambient - base light in shadows");
+    ImGui::SliderFloat("##AmbientLight", &lighting.AmbientStrength, 0.0f, 1.0f, "");
+
+    ImGui::TextUnformatted("Intensity - sun brightness");
+    ImGui::SliderFloat("##LightIntensity", &lighting.Intensity, 0.0f, 3.0f, "");
+
+    ImGui::TextUnformatted("Direction - sun angle X / Y / Z");
+    ImGui::SliderFloat3("##LightDirection", &lighting.DirectionX, -1.0f, 1.0f, "");
+
+    ImGui::Checkbox("Shadows", &lighting.ShadowsEnabled);
+    ImGui::TextUnformatted("Shadow Strength");
+    ImGui::SliderFloat("##ShadowStrength", &lighting.ShadowStrength, 0.0f, 0.85f, "");
+
+    ImGui::PopStyleColor(5);
 
     ImGui::End();
 }
@@ -434,7 +644,7 @@ void EditorGui::DrawControls()
     ImGui::BulletText("Select: left mouse drag pans scene");
     ImGui::BulletText("Move: left drag X/Y, mouse wheel Z depth");
     ImGui::BulletText("Rotate: left drag X/Y, mouse wheel Z roll");
-    ImGui::BulletText("Scale: left mouse drag up/down in Viewport");
+    ImGui::BulletText("Scale: drag up/down; terrain/wall resizes");
     ImGui::BulletText("Viewport: hold right mouse to look around");
     ImGui::BulletText("Viewport: hold right mouse + WASD to fly");
     ImGui::BulletText("Viewport: middle drag to pan");
@@ -444,11 +654,45 @@ void EditorGui::DrawControls()
     ImGui::End();
 }
 
-void EditorGui::HandleViewportMouse(Scene& scene)
+void EditorGui::HandleViewportMouse(Scene& scene, Renderer& renderer)
 {
     if (!m_ViewportHovered)
     {
         return;
+    }
+
+    if (m_CurrentTool == EditorTool::Select && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    {
+        const ImVec2 mouse = ImGui::GetMousePos();
+        const float localMouseX = mouse.x - m_ViewportImageMinX;
+        const float localMouseY = mouse.y - m_ViewportImageMinY;
+        int bestIndex = -1;
+        float bestDistanceSquared = 2500.0f;
+
+        const auto& objects = scene.GetObjects();
+        for (int index = 0; index < static_cast<int>(objects.size()); index++)
+        {
+            float projectedX = 0.0f;
+            float projectedY = 0.0f;
+            if (!renderer.ProjectWorldToViewport(objects[index].TransformData.Position, m_ViewportWidth, m_ViewportHeight, projectedX, projectedY))
+            {
+                continue;
+            }
+
+            const float deltaX = projectedX - localMouseX;
+            const float deltaY = projectedY - localMouseY;
+            const float distanceSquared = deltaX * deltaX + deltaY * deltaY;
+            if (distanceSquared < bestDistanceSquared)
+            {
+                bestDistanceSquared = distanceSquared;
+                bestIndex = index;
+            }
+        }
+
+        if (bestIndex >= 0)
+        {
+            scene.Select(bestIndex);
+        }
     }
 
     SceneObject* selected = scene.GetSelectedObject();
@@ -460,17 +704,110 @@ void EditorGui::HandleViewportMouse(Scene& scene)
     const ImVec2 delta = ImGui::GetIO().MouseDelta;
     const float wheel = ImGui::GetIO().MouseWheel;
 
+    if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+    {
+        m_ActiveMoveAxis = EditorAxis::None;
+    }
+
     if (m_CurrentTool == EditorTool::Move)
     {
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        {
+            float projectedX = 0.0f;
+            float projectedY = 0.0f;
+            if (renderer.ProjectWorldToViewport(selected->TransformData.Position, m_ViewportWidth, m_ViewportHeight, projectedX, projectedY))
+            {
+                const ImVec2 center(m_ViewportImageMinX + projectedX, m_ViewportImageMinY + projectedY);
+                const float radius = m_ViewportWidth < m_ViewportHeight ? static_cast<float>(m_ViewportWidth) * 0.18f : static_cast<float>(m_ViewportHeight) * 0.18f;
+                const ImVec2 mouse = ImGui::GetMousePos();
+                const ImVec2 xEnd(center.x + radius, center.y);
+                const ImVec2 yEnd(center.x, center.y - radius);
+                const ImVec2 zEnd(center.x + radius * 0.65f, center.y - radius * 0.65f);
+
+                auto distanceToSegmentSquared = [](ImVec2 point, ImVec2 start, ImVec2 end)
+                {
+                    const float segmentX = end.x - start.x;
+                    const float segmentY = end.y - start.y;
+                    const float lengthSquared = segmentX * segmentX + segmentY * segmentY;
+                    float t = 0.0f;
+                    if (lengthSquared > 0.0001f)
+                    {
+                        t = ((point.x - start.x) * segmentX + (point.y - start.y) * segmentY) / lengthSquared;
+                    }
+
+                    if (t < 0.0f)
+                    {
+                        t = 0.0f;
+                    }
+                    else if (t > 1.0f)
+                    {
+                        t = 1.0f;
+                    }
+
+                    const float closestX = start.x + segmentX * t;
+                    const float closestY = start.y + segmentY * t;
+                    const float deltaX = point.x - closestX;
+                    const float deltaY = point.y - closestY;
+                    return deltaX * deltaX + deltaY * deltaY;
+                };
+
+                const float xDistance = distanceToSegmentSquared(mouse, center, xEnd);
+                const float yDistance = distanceToSegmentSquared(mouse, center, yEnd);
+                const float zDistance = distanceToSegmentSquared(mouse, center, zEnd);
+                const float hitDistance = 576.0f;
+
+                m_ActiveMoveAxis = EditorAxis::None;
+                if (xDistance <= hitDistance && xDistance <= yDistance && xDistance <= zDistance)
+                {
+                    m_ActiveMoveAxis = EditorAxis::X;
+                }
+                else if (yDistance <= hitDistance && yDistance <= zDistance)
+                {
+                    m_ActiveMoveAxis = EditorAxis::Y;
+                }
+                else if (zDistance <= hitDistance)
+                {
+                    m_ActiveMoveAxis = EditorAxis::Z;
+                }
+            }
+        }
+
         if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
         {
-            selected->TransformData.Position.x += delta.x * 0.01f;
-            selected->TransformData.Position.y -= delta.y * 0.01f;
+            if (m_ActiveMoveAxis == EditorAxis::X)
+            {
+                selected->TransformData.Position.x += delta.x * 0.01f;
+            }
+            else if (m_ActiveMoveAxis == EditorAxis::Y)
+            {
+                selected->TransformData.Position.y -= delta.y * 0.01f;
+            }
+            else if (m_ActiveMoveAxis == EditorAxis::Z)
+            {
+                selected->TransformData.Position.z += delta.x * 0.01f;
+            }
+            else if (selected->Type == SceneObjectType::TerrainWall && selected->TransformData.Rotation.z > 1.0f)
+            {
+                selected->TransformData.Position.z += delta.x * 0.01f;
+                selected->TransformData.Position.y -= delta.y * 0.01f;
+            }
+            else
+            {
+                selected->TransformData.Position.x += delta.x * 0.01f;
+                selected->TransformData.Position.y -= delta.y * 0.01f;
+            }
         }
 
         if (wheel != 0.0f)
         {
-            selected->TransformData.Position.z += wheel * 0.25f;
+            if (selected->Type == SceneObjectType::TerrainWall && selected->TransformData.Rotation.z > 1.0f)
+            {
+                selected->TransformData.Position.x += wheel * 0.25f;
+            }
+            else
+            {
+                selected->TransformData.Position.z += wheel * 0.25f;
+            }
         }
     }
 
@@ -493,13 +830,33 @@ void EditorGui::HandleViewportMouse(Scene& scene)
     if (m_CurrentTool == EditorTool::Scale)
     {
         const float scaleDelta = -delta.y * 0.01f;
-        selected->TransformData.Scale.x += scaleDelta;
-        selected->TransformData.Scale.y += scaleDelta;
-        selected->TransformData.Scale.z += scaleDelta;
 
-        if (selected->TransformData.Scale.x < 0.1f)
+        if ((selected->Type == SceneObjectType::Terrain || selected->Type == SceneObjectType::TerrainWall))
         {
-            selected->TransformData.Scale = {0.1f, 0.1f, 0.1f};
+            selected->TransformData.Scale.x += scaleDelta;
+            selected->TransformData.Scale.z += scaleDelta;
+            selected->TransformData.Scale.y = 1.0f;
+
+            if (selected->TransformData.Scale.x < 0.25f)
+            {
+                selected->TransformData.Scale.x = 0.25f;
+            }
+
+            if (selected->TransformData.Scale.z < 0.25f)
+            {
+                selected->TransformData.Scale.z = 0.25f;
+            }
+        }
+        else
+        {
+            selected->TransformData.Scale.x += scaleDelta;
+            selected->TransformData.Scale.y += scaleDelta;
+            selected->TransformData.Scale.z += scaleDelta;
+
+            if (selected->TransformData.Scale.x < 0.1f)
+            {
+                selected->TransformData.Scale = {0.1f, 0.1f, 0.1f};
+            }
         }
     }
 }

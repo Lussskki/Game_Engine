@@ -1,4 +1,4 @@
-﻿#include "Renderer/Mesh.h"
+#include "Renderer/Mesh.h"
 
 #include <GL/glew.h>
 
@@ -76,6 +76,61 @@ bool Mesh::CreateGrid(int halfSize, float spacing, float yPosition)
         vertices.push_back({position, yPosition,  extent, brightness, brightness, brightness});
         indices.push_back(index++);
         indices.push_back(index++);
+    }
+
+    m_VertexArray = std::make_unique<VertexArray>();
+    m_VertexBuffer = std::make_unique<VertexBuffer>();
+    m_IndexBuffer = std::make_unique<IndexBuffer>();
+
+    m_VertexArray->Create();
+    m_VertexArray->Bind();
+
+    m_VertexBuffer->Create(vertices.data(), static_cast<unsigned int>(vertices.size() * sizeof(MeshVertex)));
+    m_IndexBuffer->Create(indices.data(), static_cast<unsigned int>(indices.size()));
+
+    m_VertexArray->AddFloatAttribute(0, 3, sizeof(MeshVertex), reinterpret_cast<const void*>(offsetof(MeshVertex, x)));
+    m_VertexArray->AddFloatAttribute(1, 3, sizeof(MeshVertex), reinterpret_cast<const void*>(offsetof(MeshVertex, r)));
+
+    m_VertexArray->Unbind();
+    return true;
+}
+
+
+bool Mesh::CreateTerrain(int halfSize, float spacing)
+{
+    std::vector<MeshVertex> vertices;
+    std::vector<unsigned int> indices;
+
+    const int vertexCount = halfSize * 2 + 1;
+    const float extent = static_cast<float>(halfSize) * spacing;
+
+    for (int z = 0; z < vertexCount; z++)
+    {
+        for (int x = 0; x < vertexCount; x++)
+        {
+            const float worldX = -extent + static_cast<float>(x) * spacing;
+            const float worldZ = -extent + static_cast<float>(z) * spacing;
+            const float checker = ((x + z) % 2 == 0) ? 0.08f : 0.0f;
+            vertices.push_back({worldX, 0.0f, worldZ, 0.28f + checker, 0.48f + checker, 0.24f + checker});
+        }
+    }
+
+    for (int z = 0; z < vertexCount - 1; z++)
+    {
+        for (int x = 0; x < vertexCount - 1; x++)
+        {
+            const unsigned int topLeft = static_cast<unsigned int>(z * vertexCount + x);
+            const unsigned int topRight = topLeft + 1;
+            const unsigned int bottomLeft = static_cast<unsigned int>((z + 1) * vertexCount + x);
+            const unsigned int bottomRight = bottomLeft + 1;
+
+            indices.push_back(topLeft);
+            indices.push_back(bottomLeft);
+            indices.push_back(topRight);
+            indices.push_back(topRight);
+            indices.push_back(bottomLeft);
+            indices.push_back(bottomRight);
+        }
     }
 
     m_VertexArray = std::make_unique<VertexArray>();
