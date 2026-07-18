@@ -12,6 +12,14 @@ A small C++ OpenGL renderer/editor scaffold with a Dear ImGui editor, viewport r
 
 ![Renderer Engine Editor - Lighting and Shadows](Screenshots/4.webp)
 
+## Progress Video
+
+I recorded a short gameplay/editor progress video showing the engine running in Play mode. The demo shows the character moving, jumping, landing on cube and circle collision shapes, and using the terrain as the ground.
+
+[![Renderer Engine character movement and jumping demo](Screenshots/5.png)](https://youtu.be/1COKq9eLRjg)
+
+Watch it here: [Renderer Engine character movement and jumping demo](https://youtu.be/1COKq9eLRjg)
+
 ## What Is Added
 
 - C++ OpenGL renderer/editor scaffold
