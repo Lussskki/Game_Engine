@@ -1,32 +1,55 @@
 ﻿# Renderer Engine
 
-A small C++ OpenGL renderer/editor scaffold in `Renderer_Opengl/Engine`.
+A small C++ OpenGL renderer/editor scaffold with a Dear ImGui editor, viewport rendering, scene objects, terrain tools, lighting controls, and simple shadows.
 
 ## Screenshots
 
 ![Renderer Engine Editor - First View](Screenshots/1.png)
 
 ![Renderer Engine Editor - Viewport and Gizmos](Screenshots/2.png)
+
+![Renderer Engine Editor - Terrain and Walls](Screenshots/3.webp)
+
+![Renderer Engine Editor - Lighting and Shadows](Screenshots/4.webp)
+
 ## What Is Added
 
-- OpenGL renderer/editor scaffold
-- Dear ImGui editor UI
-- Framebuffer viewport inside the editor
-- Scene Hierarchy and Inspector panels
-- Editable cube objects
-- Selected-object outline
-- Sky-colored viewport background
-- Ground grid
-- Move, rotate, and scale tool guides
-- Mouse camera navigation
-- Mouse-based object movement, rotation, and scale
-- Material color controls
-- Scene save/load
+- C++ OpenGL renderer/editor scaffold
+- GLFW window and input handling
+- GLEW OpenGL function loading
+- Dear ImGui editor interface
+- Framebuffer viewport rendered inside ImGui
+- Scene Hierarchy panel
+- Inspector panel
+- Stats panel
+- Controls panel
 - Console/log panel
-- Lighting controls
-## Editor Features
+- Toolbar with Select, Move, Rotate, Scale, and Camera tools
+- Editable cube objects
+- Terrain objects
+- Vertical terrain wall objects
+- Collision shape type selection for objects
+- Box, terrain, and wall collision shape names
+- Selected-object yellow outline
+- Move axis guide with X/Y/Z directions
+- Rotate circular guide
+- Scale guide and resize handles
+- Mouse-based object selection
+- Mouse-based object movement, rotation, and scale
+- Unity-style viewport camera controls
+- Sky-colored viewport background
+- Directional sun-style sky lighting
+- Ground grid
+- Material color controls
+- Scene save/load support
+- Lighting controls for ambient light, intensity, and direction
+- Shadow toggle
+- Shadow strength control
+- Simple projected shadows on terrain
 
-The editor has a basic Dear ImGui layout:
+## Editor Panels
+
+The editor currently includes:
 
 - `File` menu
 - `View` menu
@@ -39,11 +62,11 @@ The editor has a basic Dear ImGui layout:
 - `Console`
 - `Controls`
 
-The `Scene Hierarchy` lets you select objects and add/delete cubes.
+The `Scene Hierarchy` lets you add cubes, add terrain, add walls, delete objects, and select objects.
 
-The `Inspector` lets you edit the selected cube name, position, rotation, scale, and material color.
+The `Inspector` lets you edit the selected object name, type-specific settings, collision shape, position, rotation, scale, and material color.
 
-The `Viewport` renders the OpenGL scene into a framebuffer texture and displays it inside ImGui.
+The `Viewport` renders the OpenGL scene into a framebuffer texture and displays it inside the editor UI.
 
 ## Viewport Controls
 
@@ -55,21 +78,31 @@ The `Viewport` renders the OpenGL scene into a framebuffer texture and displays 
 
 ## Toolbar Tools
 
-- `Select`: left mouse drag pans scene
-- `Move`: left mouse drag moves selected object on X/Y
-- `Move`: mouse wheel moves selected object on Z depth
-- `Rotate`: left mouse drag rotates selected object on X/Y
-- `Rotate`: mouse wheel rotates selected object on Z roll
-- `Scale`: left mouse drag scales selected object
+- `Select`: select objects and pan the scene
+- `Move`: drag the X/Y/Z axis guide to move selected objects
+- `Rotate`: drag to rotate selected objects
+- `Scale`: drag to scale cubes or resize terrain/walls
 - `Camera`: viewport camera navigation mode
 
-## Visual Editor Helpers
+## Terrain And Walls
 
-- Yellow outline shows the selected object
-- Move tool shows red/green/blue axis directions
-- Rotate tool shows a circular guide
-- Scale tool shows scale handles
-- Viewport uses a sky-colored background and ground grid
+- `Add Terrain` creates a flat editable terrain plane.
+- `Add Wall` creates a vertical terrain wall.
+- Terrain can be resized by width and depth.
+- Walls can be resized by width and height.
+- Walls support direction options so they can face across different scene axes.
+
+## Lighting And Shadows
+
+The lighting panel controls:
+
+- Ambient light for shadow/base brightness
+- Sun intensity for directional light strength
+- Sun direction with X/Y/Z sliders
+- Shadows on/off
+- Shadow strength
+
+Current shadows are simple projected planar shadows. They are useful for learning and editor feedback. A future full engine version can use shadow maps for proper real-time shadows from all geometry.
 
 ## Build
 
@@ -83,6 +116,14 @@ cmake --build build
 Run:
 
 ```powershell
+.\build\Sandbox.exe
+```
+
+If PowerShell cannot find CMake, use the MSYS2 path first:
+
+```powershell
+$env:Path = 'C:\msys64\ucrt64\bin;C:\msys64\mingw64\bin;' + $env:Path
+cmake --build build
 .\build\Sandbox.exe
 ```
 
@@ -106,15 +147,19 @@ Renderer_Opengl/Libraries/
 
 ## Feature Status
 
-- Done: material color system
+- Done: editor viewport
+- Done: scene hierarchy and inspector
+- Done: cube objects
+- Done: terrain and wall objects
+- Done: transform tools
+- Done: material color controls
 - Done: scene save/load through `Scenes/default.scene`
 - Done: console/log panel
 - Done: lighting controls
+- Done: sky background and directional sun lighting
+- Done: simple projected terrain shadows
 - Added groundwork: texture class and checkerboard texture support
 - Blocked by dependency: full image texture loading needs `stb_image`
-- Blocked by dependency: model loading needs Assimp installed, for example `pacman -S mingw-w64-ucrt-x86_64-assimp`
+- Blocked by dependency: model loading needs Assimp, for example `pacman -S mingw-w64-ucrt-x86_64-assimp`
 - Next: real 3D transform gizmo picking
-
-
-
-
+- Next: real shadow mapping
