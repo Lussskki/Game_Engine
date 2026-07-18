@@ -1,4 +1,6 @@
-#pragma once
+﻿#pragma once
+
+#include "Scene/Transform.h"
 
 #include <array>
 
@@ -14,6 +16,10 @@ public:
     void Rotate(float yawDelta, float pitchDelta);
     
     std::array<float, 16> GetViewProjection(float aspectRatio) const;
+    Vec3 GetPosition() const;
+    Vec3 GetForwardDirection() const;
+    Vec3 GetRightDirection() const;
+    Vec3 GetUpDirection() const;
     float GetPitch() const;
     float GetYaw() const;
 
@@ -41,3 +47,4 @@ private:
 };
 
 }
+

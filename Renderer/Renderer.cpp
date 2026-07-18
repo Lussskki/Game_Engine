@@ -78,6 +78,12 @@ bool Renderer::Initialize()
         return false;
     }
 
+    m_CircleMesh = std::make_unique<Mesh>();
+    if (!m_CircleMesh->CreateCircle())
+    {
+        std::cerr << "Failed to create circle mesh" << std::endl;
+        return false;
+    }
     m_GridMesh = std::make_unique<Mesh>();
     if (!m_GridMesh->CreateGrid(20, 1.0f, -0.72f))
     {
@@ -270,6 +276,58 @@ bool Renderer::ProjectWorldToViewport(const Vec3& worldPosition, int width, int 
     return true;
 }
 
+bool Renderer::ViewportPointToPlane(float x, float y, int width, int height, float planeY, Vec3& worldPosition) const
+{
+    if (width <= 0 || height <= 0)
+    {
+        return false;
+    }
+
+    const float fieldOfView = 45.0f * 3.1415926535f / 180.0f;
+    const float tanHalfFov = std::tan(fieldOfView * 0.5f);
+    const float aspectRatio = static_cast<float>(width) / static_cast<float>(height);
+    const float ndcX = (x / static_cast<float>(width)) * 2.0f - 1.0f;
+    const float ndcY = 1.0f - (y / static_cast<float>(height)) * 2.0f;
+
+    const Vec3 cameraPosition = m_Camera.GetPosition();
+    const Vec3 forward = m_Camera.GetForwardDirection();
+    const Vec3 right = m_Camera.GetRightDirection();
+    const Vec3 up = m_Camera.GetUpDirection();
+
+    Vec3 direction = {
+        forward.x + right.x * ndcX * aspectRatio * tanHalfFov + up.x * ndcY * tanHalfFov,
+        forward.y + right.y * ndcX * aspectRatio * tanHalfFov + up.y * ndcY * tanHalfFov,
+        forward.z + right.z * ndcX * aspectRatio * tanHalfFov + up.z * ndcY * tanHalfFov
+    };
+
+    const float length = std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
+    if (length <= 0.0001f)
+    {
+        return false;
+    }
+
+    direction.x /= length;
+    direction.y /= length;
+    direction.z /= length;
+
+    if (std::abs(direction.y) <= 0.0001f)
+    {
+        return false;
+    }
+
+    const float distance = (planeY - cameraPosition.y) / direction.y;
+    if (distance <= 0.0f)
+    {
+        return false;
+    }
+
+    worldPosition = {
+        cameraPosition.x + direction.x * distance,
+        planeY,
+        cameraPosition.z + direction.z * distance
+    };
+    return true;
+}
 float Renderer::FindShadowPlaneY(const Scene& scene) const
 {
     for (const SceneObject& object : scene.GetObjects())
@@ -311,14 +369,21 @@ void Renderer::DrawPlanarShadows(const Scene& scene, float shadowPlaneY) const
 
     for (const SceneObject& object : scene.GetObjects())
     {
-        if (object.Type == SceneObjectType::Terrain || object.Type == SceneObjectType::TerrainWall)
+        if (object.Type == SceneObjectType::Terrain)
         {
             continue;
         }
 
         const auto shadowModel = MultiplyMatrix(shadowMatrix, object.TransformData.GetMatrix());
         m_Shader->SetMat4("u_Model", shadowModel);
-        m_CubeMesh->Draw();
+        if ((object.Type == SceneObjectType::Circle || object.Type == SceneObjectType::Character))
+        {
+            m_CircleMesh->Draw();
+        }
+        else
+        {
+            m_CubeMesh->Draw();
+        }
     }
 
     m_Shader->SetFloat("u_Alpha", 1.0f);
@@ -327,6 +392,43 @@ void Renderer::DrawPlanarShadows(const Scene& scene, float shadowPlaneY) const
     glDisable(GL_BLEND);
 }
 
+
+void Renderer::DrawCollisionShapes(const Scene& scene) const
+{
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    glLineWidth(2.0f);
+    glDisable(GL_CULL_FACE);
+    glDepthFunc(GL_LEQUAL);
+
+    m_Shader->SetInt("u_UseSolidColor", 1);
+    m_Shader->SetFloat("u_Alpha", 1.0f);
+
+    for (const SceneObject& object : scene.GetObjects())
+    {
+        if (object.CollisionShape == CollisionShapeType::None)
+        {
+            continue;
+        }
+
+        if (object.CollisionShape == CollisionShapeType::Terrain && object.Type == SceneObjectType::Terrain)
+        {
+            m_Shader->SetVec3("u_SolidColor", 0.25f, 0.95f, 0.45f);
+            m_Shader->SetMat4("u_Model", object.TransformData.GetMatrix());
+            m_TerrainMesh->Draw();
+        }
+        else if (object.CollisionShape == CollisionShapeType::Box)
+        {
+            m_Shader->SetVec3("u_SolidColor", 0.2f, 0.7f, 1.0f);
+            m_Shader->SetMat4("u_Model", object.TransformData.GetMatrix());
+            m_CubeMesh->Draw();
+        }
+    }
+
+    m_Shader->SetInt("u_UseSolidColor", 0);
+    glLineWidth(1.0f);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glDepthFunc(GL_LESS);
+}
 void Renderer::DrawScene(const Scene& scene, float aspectRatio) const
 {
     const auto viewProjection = m_Camera.GetViewProjection(aspectRatio);
@@ -353,7 +455,7 @@ void Renderer::DrawScene(const Scene& scene, float aspectRatio) const
     const auto& objects = scene.GetObjects();
     for (const SceneObject& object : objects)
     {
-        if (object.Type != SceneObjectType::Terrain && object.Type != SceneObjectType::TerrainWall)
+        if (object.Type != SceneObjectType::Terrain)
         {
             continue;
         }
@@ -372,15 +474,24 @@ void Renderer::DrawScene(const Scene& scene, float aspectRatio) const
     m_Shader->SetFloat("u_Alpha", 1.0f);
     for (const SceneObject& object : objects)
     {
-        if (object.Type == SceneObjectType::Terrain || object.Type == SceneObjectType::TerrainWall)
+        if (object.Type == SceneObjectType::Terrain)
         {
             continue;
         }
 
         m_Shader->SetMat4("u_Model", object.TransformData.GetMatrix());
         m_Shader->SetVec3("u_MaterialColor", object.MaterialData.Albedo.x, object.MaterialData.Albedo.y, object.MaterialData.Albedo.z);
-        m_CubeMesh->Draw();
+        if ((object.Type == SceneObjectType::Circle || object.Type == SceneObjectType::Character))
+        {
+            m_CircleMesh->Draw();
+        }
+        else
+        {
+            m_CubeMesh->Draw();
+        }
     }
+
+    DrawCollisionShapes(scene);
 
     const int selectedIndex = scene.GetSelectedIndex();
     if (selectedIndex < 0 || selectedIndex >= static_cast<int>(objects.size()))
@@ -397,9 +508,13 @@ void Renderer::DrawScene(const Scene& scene, float aspectRatio) const
     m_Shader->SetFloat("u_Alpha", 1.0f);
     m_Shader->SetVec3("u_SolidColor", 1.0f, 0.9f, 0.05f);
     m_Shader->SetMat4("u_Model", objects[selectedIndex].TransformData.GetMatrix());
-    if (objects[selectedIndex].Type == SceneObjectType::Terrain || objects[selectedIndex].Type == SceneObjectType::TerrainWall)
+    if (objects[selectedIndex].Type == SceneObjectType::Terrain)
     {
         m_TerrainMesh->Draw();
+    }
+    else if ((objects[selectedIndex].Type == SceneObjectType::Circle || objects[selectedIndex].Type == SceneObjectType::Character))
+    {
+        m_CircleMesh->Draw();
     }
     else
     {
@@ -413,6 +528,13 @@ void Renderer::DrawScene(const Scene& scene, float aspectRatio) const
 }
 
 }
+
+
+
+
+
+
+
 
 
 

@@ -1,4 +1,4 @@
-﻿#include "Scene/Scene.h"
+#include "Scene/Scene.h"
 
 #include "Core/ConsoleLog.h"
 
@@ -13,19 +13,18 @@ namespace
 
 int ObjectTypeToInt(SceneObjectType type)
 {
-    if (type == SceneObjectType::Terrain)
+    if (type == SceneObjectType::Circle)
     {
         return 1;
     }
 
-    if (type == SceneObjectType::TerrainWall)
+    if (type == SceneObjectType::Terrain)
     {
         return 2;
     }
 
     return 0;
 }
-
 int CollisionShapeToInt(CollisionShapeType shape)
 {
     if (shape == CollisionShapeType::Box)
@@ -38,29 +37,22 @@ int CollisionShapeToInt(CollisionShapeType shape)
         return 2;
     }
 
-    if (shape == CollisionShapeType::Wall)
-    {
-        return 3;
-    }
-
     return 0;
 }
-
 SceneObjectType ObjectTypeFromInt(int value)
 {
     if (value == 1)
     {
-        return SceneObjectType::Terrain;
+        return SceneObjectType::Circle;
     }
 
-    if (value == 2)
+    if (value == 2 || value == 3)
     {
-        return SceneObjectType::TerrainWall;
+        return SceneObjectType::Terrain;
     }
 
     return SceneObjectType::Cube;
 }
-
 CollisionShapeType CollisionShapeFromInt(int value)
 {
     if (value == 1)
@@ -68,14 +60,9 @@ CollisionShapeType CollisionShapeFromInt(int value)
         return CollisionShapeType::Box;
     }
 
-    if (value == 2)
+    if (value == 2 || value == 3)
     {
         return CollisionShapeType::Terrain;
-    }
-
-    if (value == 3)
-    {
-        return CollisionShapeType::Wall;
     }
 
     return CollisionShapeType::None;
@@ -101,6 +88,34 @@ void Scene::AddCube()
     m_SelectedIndex = static_cast<int>(m_Objects.size()) - 1;
 }
 
+void Scene::AddCircle()
+{
+    SceneObject object;
+    object.Name = "Circle " + std::to_string(m_Objects.size() + 1);
+    object.TransformData.Position.x = static_cast<float>(m_Objects.size()) * 1.8f;
+    object.Type = SceneObjectType::Circle;
+    object.CollisionShape = CollisionShapeType::Box;
+    object.MaterialData.Albedo = {0.75f, 0.85f, 1.0f};
+
+    m_Objects.push_back(object);
+    m_SelectedIndex = static_cast<int>(m_Objects.size()) - 1;
+    ConsoleLog::Info("Added circle model");
+}
+
+void Scene::AddCharacter()
+{
+    SceneObject object;
+    object.Name = "Character " + std::to_string(m_Objects.size() + 1);
+    object.Type = SceneObjectType::Character;
+    object.CollisionShape = CollisionShapeType::Box;
+    object.TransformData.Position = {0.0f, -0.35f, 0.0f};
+    object.TransformData.Scale = {0.45f, 0.45f, 0.45f};
+    object.MaterialData.Albedo = {0.82f, 0.82f, 0.90f};
+
+    m_Objects.push_back(object);
+    m_SelectedIndex = static_cast<int>(m_Objects.size()) - 1;
+    ConsoleLog::Info("Added playable character with box collision shape");
+}
 void Scene::AddTerrain()
 {
     SceneObject object;
@@ -114,22 +129,6 @@ void Scene::AddTerrain()
     m_Objects.push_back(object);
     m_SelectedIndex = static_cast<int>(m_Objects.size()) - 1;
     ConsoleLog::Info("Added terrain with terrain collision shape");
-}
-
-void Scene::AddTerrainWall()
-{
-    SceneObject object;
-    object.Name = "Wall " + std::to_string(m_Objects.size() + 1);
-    object.Type = SceneObjectType::TerrainWall;
-    object.CollisionShape = CollisionShapeType::Wall;
-    object.TransformData.Position = {0.0f, 2.0f, -4.0f};
-    object.TransformData.Rotation.x = 1.57079632679f;
-    object.TransformData.Scale = {1.0f, 1.0f, 0.45f};
-    object.MaterialData.Albedo = {0.48f, 0.62f, 0.38f};
-
-    m_Objects.push_back(object);
-    m_SelectedIndex = static_cast<int>(m_Objects.size()) - 1;
-    ConsoleLog::Info("Added vertical terrain wall with wall collision shape");
 }
 
 void Scene::DeleteSelected()
@@ -319,3 +318,9 @@ int Scene::GetSelectedIndex() const
 }
 
 }
+
+
+
+
+
+

@@ -4,6 +4,7 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -72,6 +73,12 @@ void EditorGui::Draw(Scene& scene, Renderer& renderer, float deltaTime, unsigned
     DrawLighting(renderer);
     DrawConsole();
     DrawControls();
+
+    if (!m_EditingText && ImGui::IsKeyPressed(ImGuiKey_Delete))
+    {
+        scene.DeleteSelected();
+        ConsoleLog::Info("Deleted selected object");
+    }
 }
 void EditorGui::EndFrame()
 {
@@ -120,11 +127,6 @@ void EditorGui::DrawMenuBar(Scene& scene)
                 scene.AddTerrain();
             }
 
-            if (ImGui::MenuItem("New Wall"))
-            {
-                scene.AddTerrainWall();
-            }
-
             if (ImGui::MenuItem("Delete Selected", "Del"))
             {
                 scene.DeleteSelected();
@@ -143,6 +145,31 @@ void EditorGui::DrawMenuBar(Scene& scene)
             ImGui::EndMenu();
         }
 
+
+        if (ImGui::BeginMenu("Models"))
+        {
+            if (ImGui::MenuItem("Circle"))
+            {
+                scene.AddCircle();
+            }
+
+            if (ImGui::MenuItem("Character"))
+            {
+                scene.AddCharacter();
+            }
+
+            if (ImGui::MenuItem("Cube"))
+            {
+                scene.AddCube();
+            }
+
+            if (ImGui::MenuItem("Terrain"))
+            {
+                scene.AddTerrain();
+            }
+
+            ImGui::EndMenu();
+        }
         ImGui::EndMainMenuBar();
     }
 }
@@ -159,6 +186,13 @@ void EditorGui::DrawToolbar()
 
     ImGui::Begin("Toolbar", nullptr, flags);
 
+    if (ImGui::Button(m_Playing ? "Pause" : "Play"))
+    {
+        m_Playing = !m_Playing;
+        ConsoleLog::Info(m_Playing ? "Play mode started" : "Play mode paused");
+    }
+
+    ImGui::SameLine();
     ImGui::TextUnformatted("Tool:");
     ImGui::SameLine();
 
@@ -255,46 +289,123 @@ void EditorGui::DrawViewport(Scene& scene, Renderer& renderer, unsigned int view
         const ImVec2 up(center.x, center.y - radius);
         const ImVec2 down(center.x, center.y + radius);
 
+        auto projectAxisEnd = [&](const Vec3& axis, ImVec2 fallback)
+        {
+            if (!selectedObject)
+            {
+                return fallback;
+            }
+
+            const Vec3 origin = selectedObject->TransformData.Position;
+            const Vec3 end = {
+                origin.x + axis.x * 1.6f,
+                origin.y + axis.y * 1.6f,
+                origin.z + axis.z * 1.6f
+            };
+
+            float projectedX = 0.0f;
+            float projectedY = 0.0f;
+            if (!renderer.ProjectWorldToViewport(end, m_ViewportWidth, m_ViewportHeight, projectedX, projectedY))
+            {
+                return fallback;
+            }
+
+            return ImVec2(min.x + projectedX, min.y + projectedY);
+        };
+
         if (m_CurrentTool == EditorTool::Move)
         {
-            const ImVec2 zEnd(center.x + radius * 0.65f, center.y - radius * 0.65f);
+            const ImVec2 xEnd = projectAxisEnd({1.0f, 0.0f, 0.0f}, right);
+            const ImVec2 yEnd = projectAxisEnd({0.0f, 1.0f, 0.0f}, up);
+            const ImVec2 zEnd = projectAxisEnd({0.0f, 0.0f, 1.0f}, ImVec2(center.x + radius * 0.65f, center.y - radius * 0.65f));
 
             drawList->AddCircleFilled(center, 4.0f, yellow, 16);
-            drawList->AddLine(center, right, m_ActiveMoveAxis == EditorAxis::X ? yellow : red, m_ActiveMoveAxis == EditorAxis::X ? 5.0f : 3.0f);
-            drawList->AddLine(center, up, m_ActiveMoveAxis == EditorAxis::Y ? yellow : green, m_ActiveMoveAxis == EditorAxis::Y ? 5.0f : 3.0f);
+            drawList->AddLine(center, xEnd, m_ActiveMoveAxis == EditorAxis::X ? yellow : red, m_ActiveMoveAxis == EditorAxis::X ? 5.0f : 3.0f);
+            drawList->AddLine(center, yEnd, m_ActiveMoveAxis == EditorAxis::Y ? yellow : green, m_ActiveMoveAxis == EditorAxis::Y ? 5.0f : 3.0f);
             drawList->AddLine(center, zEnd, m_ActiveMoveAxis == EditorAxis::Z ? yellow : blue, m_ActiveMoveAxis == EditorAxis::Z ? 5.0f : 3.0f);
 
-            drawList->AddTriangleFilled(right, ImVec2(right.x - arrow, right.y - arrow * 0.65f), ImVec2(right.x - arrow, right.y + arrow * 0.65f), red);
-            drawList->AddTriangleFilled(up, ImVec2(up.x - arrow * 0.65f, up.y + arrow), ImVec2(up.x + arrow * 0.65f, up.y + arrow), green);
-            drawList->AddTriangleFilled(zEnd, ImVec2(zEnd.x - arrow, zEnd.y), ImVec2(zEnd.x, zEnd.y + arrow), blue);
+            drawList->AddCircleFilled(xEnd, 5.0f, red, 16);
+            drawList->AddCircleFilled(yEnd, 5.0f, green, 16);
+            drawList->AddCircleFilled(zEnd, 5.0f, blue, 16);
 
-            drawList->AddText(ImVec2(right.x + 8.0f, right.y - 8.0f), red, "X");
-            drawList->AddText(ImVec2(up.x + 8.0f, up.y - 18.0f), green, "Y");
+            drawList->AddText(ImVec2(xEnd.x + 8.0f, xEnd.y - 8.0f), red, "X");
+            drawList->AddText(ImVec2(yEnd.x + 8.0f, yEnd.y - 18.0f), green, "Y");
             drawList->AddText(ImVec2(zEnd.x + 8.0f, zEnd.y - 8.0f), blue, "Z");
         }
 
-        if (m_CurrentTool == EditorTool::Rotate)
+        if (m_CurrentTool == EditorTool::Rotate && selectedObject)
         {
-            drawList->AddCircle(center, radius, yellow, 64, 2.5f);
+            auto projectWorldPoint = [&](const Vec3& point, ImVec2& screenPoint)
+            {
+                float projectedX = 0.0f;
+                float projectedY = 0.0f;
+                if (!renderer.ProjectWorldToViewport(point, m_ViewportWidth, m_ViewportHeight, projectedX, projectedY))
+                {
+                    return false;
+                }
 
-            drawList->AddLine(left, right, red, 2.5f);
-            drawList->AddTriangleFilled(right, ImVec2(right.x - arrow, right.y - arrow * 0.65f), ImVec2(right.x - arrow, right.y + arrow * 0.65f), red);
-            drawList->AddTriangleFilled(left, ImVec2(left.x + arrow, left.y - arrow * 0.65f), ImVec2(left.x + arrow, left.y + arrow * 0.65f), red);
+                screenPoint = ImVec2(min.x + projectedX, min.y + projectedY);
+                return true;
+            };
 
-            drawList->AddLine(up, down, blue, 2.5f);
-            drawList->AddTriangleFilled(up, ImVec2(up.x - arrow * 0.65f, up.y + arrow), ImVec2(up.x + arrow * 0.65f, up.y + arrow), blue);
-            drawList->AddTriangleFilled(down, ImVec2(down.x - arrow * 0.65f, down.y - arrow), ImVec2(down.x + arrow * 0.65f, down.y - arrow), blue);
+            auto drawRotationRing = [&](EditorAxis axis, ImU32 color)
+            {
+                const Vec3 origin = selectedObject->TransformData.Position;
+                const float ringRadius = 1.35f;
+                const int segmentCount = 96;
+                ImVec2 previousPoint;
+                bool hasPreviousPoint = false;
 
-            drawList->AddText(ImVec2(right.x + 8.0f, right.y - 18.0f), red, "+Y");
-            drawList->AddText(ImVec2(left.x - 28.0f, left.y - 18.0f), red, "-Y");
-            drawList->AddText(ImVec2(up.x + 8.0f, up.y - 18.0f), blue, "-X");
-            drawList->AddText(ImVec2(down.x + 8.0f, down.y + 2.0f), blue, "+X");
-            drawList->AddText(ImVec2(center.x - 32.0f, center.y - 8.0f), white, "Rotate");
+                for (int segmentIndex = 0; segmentIndex <= segmentCount; segmentIndex++)
+                {
+                    const float angle = static_cast<float>(segmentIndex) / static_cast<float>(segmentCount) * 6.28318530718f;
+                    const float c = std::cos(angle) * ringRadius;
+                    const float s = std::sin(angle) * ringRadius;
+                    Vec3 worldPoint = origin;
+
+                    if (axis == EditorAxis::X)
+                    {
+                        worldPoint.y += c;
+                        worldPoint.z += s;
+                    }
+                    else if (axis == EditorAxis::Y)
+                    {
+                        worldPoint.x += c;
+                        worldPoint.z += s;
+                    }
+                    else
+                    {
+                        worldPoint.x += c;
+                        worldPoint.y += s;
+                    }
+
+                    ImVec2 currentPoint;
+                    if (!projectWorldPoint(worldPoint, currentPoint))
+                    {
+                        hasPreviousPoint = false;
+                        continue;
+                    }
+
+                    if (hasPreviousPoint)
+                    {
+                        drawList->AddLine(previousPoint, currentPoint, m_ActiveRotateAxis == axis ? yellow : color, m_ActiveRotateAxis == axis ? 4.0f : 2.5f);
+                    }
+
+                    previousPoint = currentPoint;
+                    hasPreviousPoint = true;
+                }
+            };
+
+            drawList->AddCircle(center, radius * 0.75f, IM_COL32(230, 230, 230, 95), 96, 2.0f);
+            drawRotationRing(EditorAxis::X, red);
+            drawRotationRing(EditorAxis::Y, green);
+            drawRotationRing(EditorAxis::Z, blue);
+            drawList->AddCircleFilled(center, 4.0f, yellow, 16);
         }
 
         if (m_CurrentTool == EditorTool::Scale)
         {
-            if (selectedObject && (selectedObject->Type == SceneObjectType::Terrain || selectedObject->Type == SceneObjectType::TerrainWall))
+            if (selectedObject && (selectedObject->Type == SceneObjectType::Terrain))
             {
                 const float halfSize = 10.0f;
                 const Vec3 localCorners[] = {
@@ -341,7 +452,7 @@ void EditorGui::DrawViewport(Scene& scene, Renderer& renderer, unsigned int view
                     }
                 }
 
-                drawList->AddText(ImVec2(center.x + 12.0f, center.y - 8.0f), white, selectedObject->Type == SceneObjectType::TerrainWall ? "Resize Wall" : "Resize Terrain");
+                drawList->AddText(ImVec2(center.x + 12.0f, center.y - 8.0f), white, "Resize Terrain");
             }
             else
             {
@@ -367,50 +478,61 @@ void EditorGui::DrawHierarchy(Scene& scene)
 
     ImGui::Begin("Scene Hierarchy");
 
-    if (ImGui::Button("Add Cube"))
+
+    const ImGuiTreeNodeFlags rootFlags =
+        ImGuiTreeNodeFlags_DefaultOpen |
+        ImGuiTreeNodeFlags_OpenOnArrow |
+        ImGuiTreeNodeFlags_SpanAvailWidth;
+
+    if (ImGui::TreeNodeEx("First project", rootFlags))
     {
-        scene.AddCube();
-    }
-
-    ImGui::SameLine();
-
-    if (ImGui::Button("Add Terrain"))
-    {
-        scene.AddTerrain();
-    }
-
-    ImGui::SameLine();
-
-    if (ImGui::Button("Add Wall"))
-    {
-        scene.AddTerrainWall();
-    }
-
-    ImGui::SameLine();
-
-    if (ImGui::Button("Delete"))
-    {
-        scene.DeleteSelected();
-    }
-
-    ImGui::Separator();
-
-    const auto& objects = scene.GetObjects();
-    for (int index = 0; index < static_cast<int>(objects.size()); index++)
-    {
-        const bool selected = index == scene.GetSelectedIndex();
-        std::string label = objects[index].Name.empty() ? "Unnamed" : objects[index].Name;
-        label += "##SceneObject" + std::to_string(index);
-
-        if (ImGui::Selectable(label.c_str(), selected))
+        const auto& objects = scene.GetObjects();
+        for (int index = 0; index < static_cast<int>(objects.size()); index++)
         {
-            scene.Select(index);
+            const bool selected = index == scene.GetSelectedIndex();
+            std::string label = objects[index].Name.empty() ? "Unnamed" : objects[index].Name;
+            label += "##SceneObject" + std::to_string(index);
+
+            ImGuiTreeNodeFlags objectFlags =
+                ImGuiTreeNodeFlags_DefaultOpen |
+                ImGuiTreeNodeFlags_OpenOnArrow |
+                ImGuiTreeNodeFlags_SpanAvailWidth;
+
+            if (selected)
+            {
+                objectFlags |= ImGuiTreeNodeFlags_Selected;
+            }
+
+            const bool open = ImGui::TreeNodeEx(label.c_str(), objectFlags);
+            if (ImGui::IsItemClicked())
+            {
+                scene.Select(index);
+            }
+
+            if (open)
+            {
+                const char* collisionText = "Collision: None";
+                if (objects[index].CollisionShape == CollisionShapeType::Box)
+                {
+                    collisionText = "Collision: Box";
+                }
+                else if (objects[index].CollisionShape == CollisionShapeType::Terrain)
+                {
+                    collisionText = "Collision: Terrain";
+                }
+
+                ImGui::Indent(12.0f);
+                ImGui::TextDisabled("%s", collisionText);
+                ImGui::Unindent(12.0f);
+                ImGui::TreePop();
+            }
         }
+
+        ImGui::TreePop();
     }
 
     ImGui::End();
 }
-
 void EditorGui::DrawInspector(Scene& scene)
 {
     ImGui::SetNextWindowPos(ImVec2(980.0f, 30.0f), ImGuiCond_FirstUseEver);
@@ -454,9 +576,13 @@ void EditorGui::DrawInspector(Scene& scene)
     ImGui::Separator();
 
     const char* typeText = "Cube";
-    if (selected->Type == SceneObjectType::TerrainWall)
+    if (selected->Type == SceneObjectType::Circle)
     {
-        typeText = "Terrain Wall";
+        typeText = "Circle";
+    }
+    else if (selected->Type == SceneObjectType::Character)
+    {
+        typeText = "Character";
     }
     else if (selected->Type == SceneObjectType::Terrain)
     {
@@ -473,13 +599,9 @@ void EditorGui::DrawInspector(Scene& scene)
     {
         collisionIndex = 2;
     }
-    else if (selected->CollisionShape == CollisionShapeType::Wall)
-    {
-        collisionIndex = 3;
-    }
 
-    const char* collisionItems[] = {"None", "Box", "Terrain", "Wall"};
-    if (ImGui::Combo("Collision Shape", &collisionIndex, collisionItems, 4))
+    const char* collisionItems[] = {"None", "Box", "Terrain"};
+    if (ImGui::Combo("Collision Shape", &collisionIndex, collisionItems, 3))
     {
         if (collisionIndex == 1)
         {
@@ -488,10 +610,6 @@ void EditorGui::DrawInspector(Scene& scene)
         else if (collisionIndex == 2)
         {
             selected->CollisionShape = CollisionShapeType::Terrain;
-        }
-        else if (collisionIndex == 3)
-        {
-            selected->CollisionShape = CollisionShapeType::Wall;
         }
         else
         {
@@ -504,37 +622,44 @@ void EditorGui::DrawInspector(Scene& scene)
     ImGui::DragFloat3("Position", &selected->TransformData.Position.x, 0.05f);
     ImGui::DragFloat3("Rotation", &selected->TransformData.Rotation.x, 0.02f);
 
-    if (selected->Type == SceneObjectType::TerrainWall)
+    if (selected->Type == SceneObjectType::Terrain)
     {
-        ImGui::TextUnformatted("Wall Direction");
-        int wallDirection = selected->TransformData.Rotation.z > 1.0f ? 1 : 0;
-        const int previousWallDirection = wallDirection;
-        const char* wallDirectionItems[] = {"Across X", "Across Z"};
-        if (ImGui::Combo("##WallDirection", &wallDirection, wallDirectionItems, 2))
-        {
-            const float oldWidth = previousWallDirection == 0 ? selected->TransformData.Scale.x : selected->TransformData.Scale.z;
-            const float oldHeight = previousWallDirection == 0 ? selected->TransformData.Scale.z : selected->TransformData.Scale.x;
+        constexpr float HalfPi = 1.57079632679f;
 
-            if (wallDirection == 0)
+        int terrainDirection = 0;
+        if (std::abs(selected->TransformData.Rotation.x - HalfPi) < 0.1f)
+        {
+            terrainDirection = 1;
+        }
+        else if (std::abs(selected->TransformData.Rotation.z - HalfPi) < 0.1f)
+        {
+            terrainDirection = 2;
+        }
+
+        const char* terrainDirectionItems[] = {"Flat Floor", "Wall Across X", "Wall Across Z"};
+        if (ImGui::Combo("Terrain Direction", &terrainDirection, terrainDirectionItems, 3))
+        {
+            selected->TransformData.Rotation.x = 0.0f;
+            selected->TransformData.Rotation.y = 0.0f;
+            selected->TransformData.Rotation.z = 0.0f;
+
+            if (terrainDirection == 1)
             {
-                selected->TransformData.Rotation.x = 1.57079632679f;
-                selected->TransformData.Rotation.y = 0.0f;
-                selected->TransformData.Rotation.z = 0.0f;
-                selected->TransformData.Scale.x = oldWidth;
-                selected->TransformData.Scale.z = oldHeight;
+                selected->TransformData.Rotation.x = HalfPi;
             }
-            else
+            else if (terrainDirection == 2)
             {
-                selected->TransformData.Rotation.x = 0.0f;
-                selected->TransformData.Rotation.y = 0.0f;
-                selected->TransformData.Rotation.z = 1.57079632679f;
-                selected->TransformData.Scale.x = oldHeight;
-                selected->TransformData.Scale.z = oldWidth;
+                selected->TransformData.Rotation.z = HalfPi;
             }
         }
 
-        ImGui::TextUnformatted("Wall Size");
-        if (wallDirection == 0)
+        ImGui::TextUnformatted("Terrain Size");
+        if (terrainDirection == 0)
+        {
+            ImGui::DragFloat("Width X", &selected->TransformData.Scale.x, 0.05f, 0.25f, 20.0f);
+            ImGui::DragFloat("Depth Z", &selected->TransformData.Scale.z, 0.05f, 0.25f, 20.0f);
+        }
+        else if (terrainDirection == 1)
         {
             ImGui::DragFloat("Width X", &selected->TransformData.Scale.x, 0.05f, 0.25f, 20.0f);
             ImGui::DragFloat("Height Y", &selected->TransformData.Scale.z, 0.05f, 0.25f, 20.0f);
@@ -545,13 +670,6 @@ void EditorGui::DrawInspector(Scene& scene)
             ImGui::DragFloat("Height Y", &selected->TransformData.Scale.x, 0.05f, 0.25f, 20.0f);
         }
 
-        selected->TransformData.Scale.y = 1.0f;
-    }
-    else if (selected->Type == SceneObjectType::Terrain)
-    {
-        ImGui::TextUnformatted("Terrain Size");
-        ImGui::DragFloat("Width", &selected->TransformData.Scale.x, 0.05f, 0.25f, 20.0f);
-        ImGui::DragFloat("Depth", &selected->TransformData.Scale.z, 0.05f, 0.25f, 20.0f);
         selected->TransformData.Scale.y = 1.0f;
     }
     else
@@ -641,15 +759,16 @@ void EditorGui::DrawControls()
     ImGui::Begin("Controls");
 
     ImGui::TextUnformatted("Toolbar");
-    ImGui::BulletText("Select: left mouse drag pans scene");
+    ImGui::BulletText("Select: left drag selected object to place it");
     ImGui::BulletText("Move: left drag X/Y, mouse wheel Z depth");
     ImGui::BulletText("Rotate: left drag X/Y, mouse wheel Z roll");
-    ImGui::BulletText("Scale: drag up/down; terrain/wall resizes");
+    ImGui::BulletText("Scale: drag up/down; terrain resizes");
     ImGui::BulletText("Viewport: hold right mouse to look around");
     ImGui::BulletText("Viewport: hold right mouse + WASD to fly");
-    ImGui::BulletText("Viewport: middle drag to pan");
+    ImGui::BulletText("Viewport: middle mouse drag pans scene");
     ImGui::BulletText("Viewport: mouse wheel zooms in/out");
-    ImGui::BulletText("Inspector: exact values");
+    ImGui::BulletText("Play: WASD moves Character, Space jumps");
+    ImGui::BulletText("Inspector: exact values and terrain direction");
 
     ImGui::End();
 }
@@ -707,68 +826,147 @@ void EditorGui::HandleViewportMouse(Scene& scene, Renderer& renderer)
     if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
     {
         m_ActiveMoveAxis = EditorAxis::None;
+        m_ActiveRotateAxis = EditorAxis::None;
+        m_DraggingSelectedObject = false;
     }
 
-    if (m_CurrentTool == EditorTool::Move)
+    if (m_CurrentTool == EditorTool::Select)
     {
+        const ImVec2 mouse = ImGui::GetMousePos();
+        const float localMouseX = mouse.x - m_ViewportImageMinX;
+        const float localMouseY = mouse.y - m_ViewportImageMinY;
+        Vec3 hitPoint;
+
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
         {
-            float projectedX = 0.0f;
-            float projectedY = 0.0f;
-            if (renderer.ProjectWorldToViewport(selected->TransformData.Position, m_ViewportWidth, m_ViewportHeight, projectedX, projectedY))
+            if (renderer.ViewportPointToPlane(localMouseX, localMouseY, m_ViewportWidth, m_ViewportHeight, selected->TransformData.Position.y, hitPoint))
             {
-                const ImVec2 center(m_ViewportImageMinX + projectedX, m_ViewportImageMinY + projectedY);
-                const float radius = m_ViewportWidth < m_ViewportHeight ? static_cast<float>(m_ViewportWidth) * 0.18f : static_cast<float>(m_ViewportHeight) * 0.18f;
-                const ImVec2 mouse = ImGui::GetMousePos();
-                const ImVec2 xEnd(center.x + radius, center.y);
-                const ImVec2 yEnd(center.x, center.y - radius);
-                const ImVec2 zEnd(center.x + radius * 0.65f, center.y - radius * 0.65f);
-
-                auto distanceToSegmentSquared = [](ImVec2 point, ImVec2 start, ImVec2 end)
-                {
-                    const float segmentX = end.x - start.x;
-                    const float segmentY = end.y - start.y;
-                    const float lengthSquared = segmentX * segmentX + segmentY * segmentY;
-                    float t = 0.0f;
-                    if (lengthSquared > 0.0001f)
-                    {
-                        t = ((point.x - start.x) * segmentX + (point.y - start.y) * segmentY) / lengthSquared;
-                    }
-
-                    if (t < 0.0f)
-                    {
-                        t = 0.0f;
-                    }
-                    else if (t > 1.0f)
-                    {
-                        t = 1.0f;
-                    }
-
-                    const float closestX = start.x + segmentX * t;
-                    const float closestY = start.y + segmentY * t;
-                    const float deltaX = point.x - closestX;
-                    const float deltaY = point.y - closestY;
-                    return deltaX * deltaX + deltaY * deltaY;
+                m_SelectedDragOffset = {
+                    selected->TransformData.Position.x - hitPoint.x,
+                    0.0f,
+                    selected->TransformData.Position.z - hitPoint.z
                 };
+                m_DraggingSelectedObject = true;
+            }
+        }
 
-                const float xDistance = distanceToSegmentSquared(mouse, center, xEnd);
-                const float yDistance = distanceToSegmentSquared(mouse, center, yEnd);
-                const float zDistance = distanceToSegmentSquared(mouse, center, zEnd);
-                const float hitDistance = 576.0f;
+        if (m_DraggingSelectedObject && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+        {
+            if (renderer.ViewportPointToPlane(localMouseX, localMouseY, m_ViewportWidth, m_ViewportHeight, selected->TransformData.Position.y, hitPoint))
+            {
+                selected->TransformData.Position.x = hitPoint.x + m_SelectedDragOffset.x;
+                selected->TransformData.Position.z = hitPoint.z + m_SelectedDragOffset.z;
+            }
+        }
 
-                m_ActiveMoveAxis = EditorAxis::None;
-                if (xDistance <= hitDistance && xDistance <= yDistance && xDistance <= zDistance)
-                {
-                    m_ActiveMoveAxis = EditorAxis::X;
-                }
-                else if (yDistance <= hitDistance && yDistance <= zDistance)
-                {
-                    m_ActiveMoveAxis = EditorAxis::Y;
-                }
-                else if (zDistance <= hitDistance)
-                {
-                    m_ActiveMoveAxis = EditorAxis::Z;
-                }
+        return;
+    }
+    if (m_CurrentTool == EditorTool::Move)
+    {
+        auto distanceToSegmentSquared = [](ImVec2 point, ImVec2 start, ImVec2 end)
+        {
+            const float segmentX = end.x - start.x;
+            const float segmentY = end.y - start.y;
+            const float lengthSquared = segmentX * segmentX + segmentY * segmentY;
+            float t = 0.0f;
+            if (lengthSquared > 0.0001f)
+            {
+                t = ((point.x - start.x) * segmentX + (point.y - start.y) * segmentY) / lengthSquared;
+            }
+
+            if (t < 0.0f)
+            {
+                t = 0.0f;
+            }
+            else if (t > 1.0f)
+            {
+                t = 1.0f;
+            }
+
+            const float closestX = start.x + segmentX * t;
+            const float closestY = start.y + segmentY * t;
+            const float deltaX = point.x - closestX;
+            const float deltaY = point.y - closestY;
+            return deltaX * deltaX + deltaY * deltaY;
+        };
+
+        auto projectAxis = [&](const Vec3& axis, ImVec2& center, ImVec2& end)
+        {
+            float centerX = 0.0f;
+            float centerY = 0.0f;
+            if (!renderer.ProjectWorldToViewport(selected->TransformData.Position, m_ViewportWidth, m_ViewportHeight, centerX, centerY))
+            {
+                return false;
+            }
+
+            const Vec3 axisEnd = {
+                selected->TransformData.Position.x + axis.x * 1.6f,
+                selected->TransformData.Position.y + axis.y * 1.6f,
+                selected->TransformData.Position.z + axis.z * 1.6f
+            };
+
+            float endX = 0.0f;
+            float endY = 0.0f;
+            if (!renderer.ProjectWorldToViewport(axisEnd, m_ViewportWidth, m_ViewportHeight, endX, endY))
+            {
+                return false;
+            }
+
+            center = ImVec2(m_ViewportImageMinX + centerX, m_ViewportImageMinY + centerY);
+            end = ImVec2(m_ViewportImageMinX + endX, m_ViewportImageMinY + endY);
+            return true;
+        };
+
+        auto dragAmountOnAxis = [&](const Vec3& axis)
+        {
+            ImVec2 center;
+            ImVec2 end;
+            if (!projectAxis(axis, center, end))
+            {
+                return 0.0f;
+            }
+
+            const float axisX = end.x - center.x;
+            const float axisY = end.y - center.y;
+            const float length = std::sqrt(axisX * axisX + axisY * axisY);
+            if (length <= 0.0001f)
+            {
+                return 0.0f;
+            }
+
+            const float normalizedX = axisX / length;
+            const float normalizedY = axisY / length;
+            return (delta.x * normalizedX + delta.y * normalizedY) * 0.015f;
+        };
+
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        {
+            const ImVec2 mouse = ImGui::GetMousePos();
+            ImVec2 center;
+            ImVec2 xEnd;
+            ImVec2 yEnd;
+            ImVec2 zEnd;
+            const bool hasX = projectAxis({1.0f, 0.0f, 0.0f}, center, xEnd);
+            const bool hasY = projectAxis({0.0f, 1.0f, 0.0f}, center, yEnd);
+            const bool hasZ = projectAxis({0.0f, 0.0f, 1.0f}, center, zEnd);
+            const float hitDistance = 576.0f;
+
+            const float xDistance = hasX ? distanceToSegmentSquared(mouse, center, xEnd) : 999999.0f;
+            const float yDistance = hasY ? distanceToSegmentSquared(mouse, center, yEnd) : 999999.0f;
+            const float zDistance = hasZ ? distanceToSegmentSquared(mouse, center, zEnd) : 999999.0f;
+
+            m_ActiveMoveAxis = EditorAxis::None;
+            if (xDistance <= hitDistance && xDistance <= yDistance && xDistance <= zDistance)
+            {
+                m_ActiveMoveAxis = EditorAxis::X;
+            }
+            else if (yDistance <= hitDistance && yDistance <= zDistance)
+            {
+                m_ActiveMoveAxis = EditorAxis::Y;
+            }
+            else if (zDistance <= hitDistance)
+            {
+                m_ActiveMoveAxis = EditorAxis::Z;
             }
         }
 
@@ -776,37 +974,176 @@ void EditorGui::HandleViewportMouse(Scene& scene, Renderer& renderer)
         {
             if (m_ActiveMoveAxis == EditorAxis::X)
             {
-                selected->TransformData.Position.x += delta.x * 0.01f;
+                selected->TransformData.Position.x += dragAmountOnAxis({1.0f, 0.0f, 0.0f});
             }
             else if (m_ActiveMoveAxis == EditorAxis::Y)
             {
-                selected->TransformData.Position.y -= delta.y * 0.01f;
+                selected->TransformData.Position.y += dragAmountOnAxis({0.0f, 1.0f, 0.0f});
             }
             else if (m_ActiveMoveAxis == EditorAxis::Z)
             {
-                selected->TransformData.Position.z += delta.x * 0.01f;
-            }
-            else if (selected->Type == SceneObjectType::TerrainWall && selected->TransformData.Rotation.z > 1.0f)
-            {
-                selected->TransformData.Position.z += delta.x * 0.01f;
-                selected->TransformData.Position.y -= delta.y * 0.01f;
-            }
-            else
-            {
-                selected->TransformData.Position.x += delta.x * 0.01f;
-                selected->TransformData.Position.y -= delta.y * 0.01f;
+                selected->TransformData.Position.z += dragAmountOnAxis({0.0f, 0.0f, 1.0f});
             }
         }
 
         if (wheel != 0.0f)
         {
-            if (selected->Type == SceneObjectType::TerrainWall && selected->TransformData.Rotation.z > 1.0f)
+            selected->TransformData.Position.z += wheel * 0.25f;
+        }
+    }
+
+    if (m_CurrentTool == EditorTool::Rotate)
+    {
+        auto distanceToSegmentSquared = [](ImVec2 point, ImVec2 start, ImVec2 end)
+        {
+            const float segmentX = end.x - start.x;
+            const float segmentY = end.y - start.y;
+            const float lengthSquared = segmentX * segmentX + segmentY * segmentY;
+            float t = 0.0f;
+            if (lengthSquared > 0.0001f)
             {
-                selected->TransformData.Position.x += wheel * 0.25f;
+                t = ((point.x - start.x) * segmentX + (point.y - start.y) * segmentY) / lengthSquared;
             }
-            else
+
+            if (t < 0.0f)
             {
-                selected->TransformData.Position.z += wheel * 0.25f;
+                t = 0.0f;
+            }
+            else if (t > 1.0f)
+            {
+                t = 1.0f;
+            }
+
+            const float closestX = start.x + segmentX * t;
+            const float closestY = start.y + segmentY * t;
+            const float deltaX = point.x - closestX;
+            const float deltaY = point.y - closestY;
+            return deltaX * deltaX + deltaY * deltaY;
+        };
+
+        auto projectWorldPoint = [&](const Vec3& point, ImVec2& screenPoint)
+        {
+            float projectedX = 0.0f;
+            float projectedY = 0.0f;
+            if (!renderer.ProjectWorldToViewport(point, m_ViewportWidth, m_ViewportHeight, projectedX, projectedY))
+            {
+                return false;
+            }
+
+            screenPoint = ImVec2(m_ViewportImageMinX + projectedX, m_ViewportImageMinY + projectedY);
+            return true;
+        };
+
+        auto closestRingDistance = [&](EditorAxis axis, ImVec2 mouse)
+        {
+            const Vec3 origin = selected->TransformData.Position;
+            const float ringRadius = 1.35f;
+            const int segmentCount = 72;
+            float closestDistance = 999999.0f;
+            ImVec2 previousPoint;
+            bool hasPreviousPoint = false;
+
+            for (int segmentIndex = 0; segmentIndex <= segmentCount; segmentIndex++)
+            {
+                const float angle = static_cast<float>(segmentIndex) / static_cast<float>(segmentCount) * 6.28318530718f;
+                const float c = std::cos(angle) * ringRadius;
+                const float s = std::sin(angle) * ringRadius;
+                Vec3 worldPoint = origin;
+
+                if (axis == EditorAxis::X)
+                {
+                    worldPoint.y += c;
+                    worldPoint.z += s;
+                }
+                else if (axis == EditorAxis::Y)
+                {
+                    worldPoint.x += c;
+                    worldPoint.z += s;
+                }
+                else
+                {
+                    worldPoint.x += c;
+                    worldPoint.y += s;
+                }
+
+                ImVec2 currentPoint;
+                if (!projectWorldPoint(worldPoint, currentPoint))
+                {
+                    hasPreviousPoint = false;
+                    continue;
+                }
+
+                if (hasPreviousPoint)
+                {
+                    const float distance = distanceToSegmentSquared(mouse, previousPoint, currentPoint);
+                    if (distance < closestDistance)
+                    {
+                        closestDistance = distance;
+                    }
+                }
+
+                previousPoint = currentPoint;
+                hasPreviousPoint = true;
+            }
+
+            return closestDistance;
+        };
+
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        {
+            const ImVec2 mouse = ImGui::GetMousePos();
+            const float xDistance = closestRingDistance(EditorAxis::X, mouse);
+            const float yDistance = closestRingDistance(EditorAxis::Y, mouse);
+            const float zDistance = closestRingDistance(EditorAxis::Z, mouse);
+            const float hitDistance = 625.0f;
+
+            m_ActiveRotateAxis = EditorAxis::None;
+            if (xDistance <= hitDistance && xDistance <= yDistance && xDistance <= zDistance)
+            {
+                m_ActiveRotateAxis = EditorAxis::X;
+            }
+            else if (yDistance <= hitDistance && yDistance <= zDistance)
+            {
+                m_ActiveRotateAxis = EditorAxis::Y;
+            }
+            else if (zDistance <= hitDistance)
+            {
+                m_ActiveRotateAxis = EditorAxis::Z;
+            }
+        }
+
+        if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && m_ActiveRotateAxis != EditorAxis::None)
+        {
+            ImVec2 center;
+            if (projectWorldPoint(selected->TransformData.Position, center))
+            {
+                const ImVec2 currentMouse = ImGui::GetMousePos();
+                const ImVec2 previousMouse(currentMouse.x - delta.x, currentMouse.y - delta.y);
+                const float currentAngle = std::atan2(currentMouse.y - center.y, currentMouse.x - center.x);
+                const float previousAngle = std::atan2(previousMouse.y - center.y, previousMouse.x - center.x);
+                float angleDelta = currentAngle - previousAngle;
+
+                if (angleDelta > 3.14159265359f)
+                {
+                    angleDelta -= 6.28318530718f;
+                }
+                else if (angleDelta < -3.14159265359f)
+                {
+                    angleDelta += 6.28318530718f;
+                }
+
+                if (m_ActiveRotateAxis == EditorAxis::X)
+                {
+                    selected->TransformData.Rotation.x += angleDelta;
+                }
+                else if (m_ActiveRotateAxis == EditorAxis::Y)
+                {
+                    selected->TransformData.Rotation.y += angleDelta;
+                }
+                else if (m_ActiveRotateAxis == EditorAxis::Z)
+                {
+                    selected->TransformData.Rotation.z += angleDelta;
+                }
             }
         }
     }
@@ -816,22 +1153,11 @@ void EditorGui::HandleViewportMouse(Scene& scene, Renderer& renderer)
         return;
     }
 
-    if (m_CurrentTool == EditorTool::Rotate)
-    {
-        selected->TransformData.Rotation.y += delta.x * 0.01f;
-        selected->TransformData.Rotation.x += delta.y * 0.01f;
-
-        if (wheel != 0.0f)
-        {
-            selected->TransformData.Rotation.z += wheel * 0.12f;
-        }
-    }
-
     if (m_CurrentTool == EditorTool::Scale)
     {
         const float scaleDelta = -delta.y * 0.01f;
 
-        if ((selected->Type == SceneObjectType::Terrain || selected->Type == SceneObjectType::TerrainWall))
+        if ((selected->Type == SceneObjectType::Terrain))
         {
             selected->TransformData.Scale.x += scaleDelta;
             selected->TransformData.Scale.z += scaleDelta;
@@ -862,6 +1188,25 @@ void EditorGui::HandleViewportMouse(Scene& scene, Renderer& renderer)
 }
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -36,6 +36,7 @@ public:
     void BeginScreenFrame(int width, int height, float r, float g, float b, float a) const;
     void RenderSceneToViewport(const Scene& scene, int width, int height);
     bool ProjectWorldToViewport(const Vec3& worldPosition, int width, int height, float& x, float& y) const;
+    bool ViewportPointToPlane(float x, float y, int width, int height, float planeY, Vec3& worldPosition) const;
 
     unsigned int GetViewportTextureId() const;
     LightingSettings& GetLightingSettings();
@@ -44,11 +45,13 @@ private:
     void DrawSkyBackground(float cameraYaw, float cameraPitch, float aspectRatio) const;
     void DrawScene(const Scene& scene, float aspectRatio) const;
     void DrawPlanarShadows(const Scene& scene, float shadowPlaneY) const;
+    void DrawCollisionShapes(const Scene& scene) const;
     float FindShadowPlaneY(const Scene& scene) const;
 
     std::unique_ptr<Shader> m_Shader;
     std::unique_ptr<Shader> m_SkyShader;
     std::unique_ptr<Mesh> m_CubeMesh;
+    std::unique_ptr<Mesh> m_CircleMesh;
     std::unique_ptr<Mesh> m_GridMesh;
     std::unique_ptr<Mesh> m_TerrainMesh;
     std::unique_ptr<Framebuffer> m_ViewportFramebuffer;
@@ -61,6 +64,8 @@ private:
 };
 
 }
+
+
 
 
 

@@ -82,6 +82,10 @@ public:
         return m_CurrentTool == EditorTool::Rotate;
     }
 
+    bool IsPlaying() const
+    {
+        return m_Playing;
+    }
     float GetMouseWheel() const;
 
 private:
@@ -99,6 +103,10 @@ private:
 
     EditorTool m_CurrentTool = EditorTool::Select;
     EditorAxis m_ActiveMoveAxis = EditorAxis::None;
+    EditorAxis m_ActiveRotateAxis = EditorAxis::None;
+    bool m_Playing = false;
+    bool m_DraggingSelectedObject = false;
+    Vec3 m_SelectedDragOffset;
     bool m_Initialized = false;
     bool m_ViewportHovered = false;
     bool m_ViewportFocused = false;
@@ -112,6 +120,8 @@ private:
 };
 
 }
+
+
 
 
 

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "Renderer/Material.h"
 #include "Scene/Transform.h"
@@ -12,16 +12,16 @@ namespace Engine
 enum class SceneObjectType
 {
     Cube,
-    Terrain,
-    TerrainWall
+    Circle,
+    Character,
+    Terrain
 };
 
 enum class CollisionShapeType
 {
     None,
     Box,
-    Terrain,
-    Wall
+    Terrain
 };
 
 struct SceneObject
@@ -39,8 +39,9 @@ public:
     Scene();
 
     void AddCube();
+    void AddCircle();
+    void AddCharacter();
     void AddTerrain();
-    void AddTerrainWall();
     void DeleteSelected();
     void SelectNext();
     void SelectPrevious();
@@ -61,3 +62,6 @@ private:
 };
 
 }
+
+
+

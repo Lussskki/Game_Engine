@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Renderer/IndexBuffer.h"
 #include "Renderer/VertexArray.h"
@@ -13,6 +13,7 @@ class Mesh
 {
 public:
     bool CreateCube();
+    bool CreateCircle();
     bool CreateGrid(int halfSize, float spacing, float yPosition);
     bool CreateTerrain(int halfSize, float spacing);
     void Draw() const;
@@ -25,4 +26,5 @@ private:
 };
 
 }
+
 

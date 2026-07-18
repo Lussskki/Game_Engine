@@ -1,4 +1,4 @@
-#include "Renderer/Camera.h"
+﻿#include "Renderer/Camera.h"
 
 #include <algorithm>
 #include <cmath>
@@ -49,6 +49,30 @@ std::array<float, 16> Camera::GetViewProjection(float aspectRatio) const
     return Multiply(projection, view);
 }
 
+Vec3 Camera::GetPosition() const
+{
+    return {m_Position.x, m_Position.y, m_Position.z};
+}
+
+Vec3 Camera::GetForwardDirection() const
+{
+    const Vector3 forward = GetForward();
+    return {forward.x, forward.y, forward.z};
+}
+
+Vec3 Camera::GetRightDirection() const
+{
+    const Vector3 right = GetRight();
+    return {right.x, right.y, right.z};
+}
+
+Vec3 Camera::GetUpDirection() const
+{
+    const Vector3 right = GetRight();
+    const Vector3 forward = GetForward();
+    const Vector3 up = Cross(right, forward);
+    return {up.x, up.y, up.z};
+}
 float Camera::GetPitch() const
 {
     return m_Pitch;
@@ -148,3 +172,4 @@ std::array<float, 16> Camera::Multiply(const std::array<float, 16>& left, const 
 }
 
 }
+
