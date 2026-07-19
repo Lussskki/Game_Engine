@@ -1,4 +1,4 @@
-﻿# Renderer Engine
+﻿# Renderer Engine - Merso
 
 A small C++ OpenGL renderer/editor scaffold with a Dear ImGui editor, viewport rendering, scene objects, terrain tools, lighting controls, and simple shadows.
 
@@ -20,8 +20,12 @@ I recorded a short gameplay/editor progress video showing the engine running in 
 
 Watch it here: [Renderer Engine character movement and jumping demo](https://youtu.be/1COKq9eLRjg)
 
+## Icon
+![Logo](Assets/Logo/Merso.png)
+
 ## What Is Added
 
+- Engine logo 
 - C++ OpenGL renderer/editor scaffold
 - GLFW window and input handling
 - GLEW OpenGL function loading
