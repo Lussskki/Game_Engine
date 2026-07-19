@@ -13,7 +13,7 @@ Application::~Application() = default;
 
 bool Application::Initialize()
 {
-    m_Window = std::make_unique<Window>(1280, 720, "Renderer Engine");
+    m_Window = std::make_unique<Window>(1280, 720, "Merso");
     if (!m_Window->Initialize())
     {
         std::cerr << "Failed to initialize window" << std::endl;
@@ -139,7 +139,8 @@ float Application::FindGroundY(float x, float z, float fallbackY) const
         const float halfDepth = 10.0f * object.TransformData.Scale.z;
         const bool insideX = x >= object.TransformData.Position.x - halfWidth && x <= object.TransformData.Position.x + halfWidth;
         const bool insideZ = z >= object.TransformData.Position.z - halfDepth && z <= object.TransformData.Position.z + halfDepth;
-        if (insideX && insideZ && (!foundGround || object.TransformData.Position.y > groundY))
+        const bool belowCharacterFeet = object.TransformData.Position.y <= fallbackY + 0.18f;
+        if (insideX && insideZ && belowCharacterFeet && (!foundGround || object.TransformData.Position.y > groundY))
         {
             groundY = object.TransformData.Position.y;
             foundGround = true;
@@ -220,7 +221,84 @@ void Application::ResolveCharacterCollisions(SceneObject& character)
 
         for (const SceneObject& object : m_Scene.GetObjects())
         {
-            if (&object == &character || object.CollisionShape != CollisionShapeType::Box || object.Type == SceneObjectType::Character)
+            if (&object == &character || object.Type == SceneObjectType::Character)
+            {
+                continue;
+            }
+
+            if (object.CollisionShape == CollisionShapeType::Terrain && object.Type == SceneObjectType::Terrain)
+            {
+                constexpr float HalfPi = 1.57079632679f;
+                const bool wallAcrossX = std::abs(object.TransformData.Rotation.x - HalfPi) < 0.1f;
+                const bool wallAcrossZ = std::abs(object.TransformData.Rotation.z - HalfPi) < 0.1f;
+
+                if (!wallAcrossX && !wallAcrossZ)
+                {
+                    const float halfWidth = 10.0f * object.TransformData.Scale.x + characterRadius;
+                    const float halfDepth = 10.0f * object.TransformData.Scale.z + characterRadius;
+                    const bool insideX = character.TransformData.Position.x >= object.TransformData.Position.x - halfWidth && character.TransformData.Position.x <= object.TransformData.Position.x + halfWidth;
+                    const bool insideZ = character.TransformData.Position.z >= object.TransformData.Position.z - halfDepth && character.TransformData.Position.z <= object.TransformData.Position.z + halfDepth;
+                    const float deltaY = character.TransformData.Position.y - object.TransformData.Position.y;
+                    const float overlapY = characterHalfHeight - std::abs(deltaY);
+
+                    if (insideX && insideZ && overlapY > 0.0f)
+                    {
+                        const float direction = deltaY < 0.0f ? -1.0f : 1.0f;
+                        character.TransformData.Position.y += direction * (overlapY + 0.01f);
+
+                        if (direction > 0.0f)
+                        {
+                            m_CharacterVerticalVelocity = 0.0f;
+                            m_CharacterGrounded = true;
+                        }
+                        else if (m_CharacterVerticalVelocity > 0.0f)
+                        {
+                            m_CharacterVerticalVelocity = 0.0f;
+                        }
+
+                        resolvedAny = true;
+                    }
+
+                    continue;
+                }
+
+                if (wallAcrossX)
+                {
+                    const float halfWidth = 10.0f * object.TransformData.Scale.x + characterRadius;
+                    const float halfHeight = 10.0f * object.TransformData.Scale.z + characterHalfHeight;
+                    const bool insideX = character.TransformData.Position.x >= object.TransformData.Position.x - halfWidth && character.TransformData.Position.x <= object.TransformData.Position.x + halfWidth;
+                    const bool insideY = character.TransformData.Position.y >= object.TransformData.Position.y - halfHeight && character.TransformData.Position.y <= object.TransformData.Position.y + halfHeight;
+                    const float deltaZ = character.TransformData.Position.z - object.TransformData.Position.z;
+                    const float overlapZ = characterRadius - std::abs(deltaZ);
+
+                    if (insideX && insideY && overlapZ > 0.0f)
+                    {
+                        const float direction = deltaZ < 0.0f ? -1.0f : 1.0f;
+                        character.TransformData.Position.z += direction * (overlapZ + 0.01f);
+                        resolvedAny = true;
+                    }
+                }
+                else
+                {
+                    const float halfWidth = 10.0f * object.TransformData.Scale.z + characterRadius;
+                    const float halfHeight = 10.0f * object.TransformData.Scale.x + characterHalfHeight;
+                    const bool insideZ = character.TransformData.Position.z >= object.TransformData.Position.z - halfWidth && character.TransformData.Position.z <= object.TransformData.Position.z + halfWidth;
+                    const bool insideY = character.TransformData.Position.y >= object.TransformData.Position.y - halfHeight && character.TransformData.Position.y <= object.TransformData.Position.y + halfHeight;
+                    const float deltaX = character.TransformData.Position.x - object.TransformData.Position.x;
+                    const float overlapX = characterRadius - std::abs(deltaX);
+
+                    if (insideZ && insideY && overlapX > 0.0f)
+                    {
+                        const float direction = deltaX < 0.0f ? -1.0f : 1.0f;
+                        character.TransformData.Position.x += direction * (overlapX + 0.01f);
+                        resolvedAny = true;
+                    }
+                }
+
+                continue;
+            }
+
+            if (object.CollisionShape != CollisionShapeType::Box)
             {
                 continue;
             }

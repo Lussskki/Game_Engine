@@ -72,7 +72,6 @@ CollisionShapeType CollisionShapeFromInt(int value)
 
 Scene::Scene()
 {
-    AddCube();
 }
 
 void Scene::AddCube()
