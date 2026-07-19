@@ -1,4 +1,5 @@
 #include "Core/Application.h"
+#include "ThirdParty/stb_image.h"
 
 #include <GLFW/glfw3.h>
 #include <algorithm>
@@ -19,6 +20,24 @@ bool Application::Initialize()
         std::cerr << "Failed to initialize window" << std::endl;
         return false;
     }
+
+        // Set window icon
+        GLFWimage icon;
+        icon.pixels = stbi_load("Assets/Logo/Merso.png",
+                                &icon.width,
+                                &icon.height,
+                                nullptr,
+                                4);
+
+        if (!icon.pixels)
+        {
+            std::cout << "Failed to load icon: " << stbi_failure_reason() << std::endl;
+        }
+        else
+        {
+            glfwSetWindowIcon(m_Window->GetNativeWindow(), 1, &icon);
+            stbi_image_free(icon.pixels);
+        }
 
     m_Renderer = std::make_unique<Renderer>();
     if (!m_Renderer->Initialize())

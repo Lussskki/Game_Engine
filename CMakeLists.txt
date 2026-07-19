@@ -15,6 +15,7 @@ find_package(OpenGL REQUIRED)
 
 add_library(RendererEngine STATIC
     Core/Application.cpp
+    ThirdParty/stb_image.cpp
     Core/ConsoleLog.cpp
     Editor/EditorController.cpp
     Editor/EditorGui.cpp
@@ -63,9 +64,11 @@ if(MINGW)
     if(NOT GLEW_LIBRARY)
         message(FATAL_ERROR "GLEW for MinGW was not found. Install it with: pacman -S mingw-w64-ucrt-x86_64-glew")
     endif()
+
 elseif(MSVC)
     set(GLFW_LIBRARY ${GLFW_ROOT}/lib-vc2022/glfw3.lib)
     set(GLEW_LIBRARY ${GLEW_ROOT}/lib/Release/x64/glew32.lib)
+
 else()
     message(FATAL_ERROR "Unsupported compiler. Use MSYS2 MinGW/UCRT64 or Visual Studio.")
 endif()
@@ -76,26 +79,29 @@ target_link_libraries(RendererEngine PUBLIC
     ${GLEW_LIBRARY}
 )
 
-add_executable(Sandbox
+# Main executable
+add_executable(Merso
     Sandbox/Main.cpp
+    Resources/app.rc
 )
 
-target_link_libraries(Sandbox PRIVATE RendererEngine)
+target_link_libraries(Merso PRIVATE RendererEngine)
 
-add_custom_command(TARGET Sandbox POST_BUILD
+# Copy shaders after build
+add_custom_command(TARGET Merso POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/Shaders
-        $<TARGET_FILE_DIR:Sandbox>/Shaders
+        $<TARGET_FILE_DIR:Merso>/Shaders
 )
 
+# Copy DLLs when using MSVC
 if(MSVC)
-    add_custom_command(TARGET Sandbox POST_BUILD
+    add_custom_command(TARGET Merso POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${GLEW_ROOT}/bin/Release/x64/glew32.dll
-            $<TARGET_FILE_DIR:Sandbox>/glew32.dll
+            $<TARGET_FILE_DIR:Merso>/glew32.dll
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${GLFW_ROOT}/lib-vc2022/glfw3.dll
-            $<TARGET_FILE_DIR:Sandbox>/glfw3.dll
+            $<TARGET_FILE_DIR:Merso>/glfw3.dll
     )
 endif()
-
