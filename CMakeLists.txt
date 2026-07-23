@@ -87,11 +87,24 @@ add_executable(Merso
 
 target_link_libraries(Merso PRIVATE RendererEngine)
 
+add_executable(MersoPlayer
+    Sandbox/PlayerMain.cpp
+    Resources/app.rc
+)
+
+target_link_libraries(MersoPlayer PRIVATE RendererEngine)
+
 # Copy shaders after build
 add_custom_command(TARGET Merso POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_CURRENT_SOURCE_DIR}/Shaders
         $<TARGET_FILE_DIR:Merso>/Shaders
+)
+
+add_custom_command(TARGET MersoPlayer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/Shaders
+        $<TARGET_FILE_DIR:MersoPlayer>/Shaders
 )
 
 # Copy DLLs when using MSVC

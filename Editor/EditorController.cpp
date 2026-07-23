@@ -9,16 +9,6 @@ namespace Engine
 
 void EditorController::Update(Scene& scene, const Input& input, float deltaTime, bool allowMouseRotation)
 {
-    if (input.IsKeyJustPressed(GLFW_KEY_N))
-    {
-        scene.AddCube();
-    }
-
-    if (input.IsKeyJustPressed(GLFW_KEY_DELETE))
-    {
-        scene.DeleteSelected();
-    }
-
     if (input.IsKeyJustPressed(GLFW_KEY_TAB))
     {
         if (input.IsKeyPressed(GLFW_KEY_LEFT_SHIFT) || input.IsKeyPressed(GLFW_KEY_RIGHT_SHIFT))

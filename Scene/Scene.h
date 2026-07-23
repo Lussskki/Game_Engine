@@ -38,6 +38,12 @@ class Scene
 public:
     Scene();
 
+    void NewProject(const std::string& projectName = "Untitled Project", const std::string& sceneName = "Main Scene");
+    void SetProjectName(const std::string& projectName);
+    void SetSceneName(const std::string& sceneName);
+    const std::string& GetProjectName() const;
+    const std::string& GetSceneName() const;
+
     void AddCube();
     void AddCircle();
     void AddCharacter();
@@ -57,6 +63,8 @@ public:
     int GetSelectedIndex() const;
 
 private:
+    std::string m_ProjectName = "Untitled Project";
+    std::string m_SceneName = "Main Scene";
     std::vector<SceneObject> m_Objects;
     int m_SelectedIndex = 0;
 };

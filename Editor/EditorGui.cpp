@@ -6,14 +6,147 @@
 #include <GLFW/glfw3.h>
 #include <cmath>
 #include <cstdint>
+#include <cctype>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 namespace Engine
 {
+namespace
+{
+
+std::string MakeSafeFileName(const std::string& name, const std::string& fallback)
+{
+    std::string fileName = name;
+    for (char& character : fileName)
+    {
+        const unsigned char value = static_cast<unsigned char>(character);
+        if (!std::isalnum(value) && character != '-' && character != '_')
+        {
+            character = '_';
+        }
+    }
+
+    if (fileName.empty())
+    {
+        fileName = fallback;
+    }
+
+    return fileName;
+}
+
+std::filesystem::path GetProjectSavePath(const Scene& scene)
+{
+    return std::filesystem::path("Scenes") / (MakeSafeFileName(scene.GetProjectName(), "Untitled_Project") + ".scene");
+}
+
+std::filesystem::path GetRunningExecutablePath()
+{
+#ifdef _WIN32
+    char path[MAX_PATH] = {};
+    const DWORD length = GetModuleFileNameA(nullptr, path, MAX_PATH);
+    if (length > 0 && length < MAX_PATH)
+    {
+        return path;
+    }
+#endif
+
+    return std::filesystem::current_path() / "Merso.exe";
+}
+
+std::filesystem::path GetPlayerExecutablePath()
+{
+    return GetRunningExecutablePath().parent_path() / "MersoPlayer.exe";
+}
+
+void SaveProject(Scene& scene)
+{
+    std::filesystem::create_directories("Scenes");
+    scene.SaveToFile(GetProjectSavePath(scene).string());
+}
+
+void ExportProject(Scene& scene)
+{
+    SaveProject(scene);
+
+    const std::string exportName = MakeSafeFileName(scene.GetProjectName(), "Untitled_Project");
+    const std::filesystem::path exportRoot = std::filesystem::path("Exports") / exportName;
+    const std::filesystem::path exportScene = exportRoot / "Scenes" / (exportName + ".scene");
+    const std::filesystem::path exportExecutable = exportRoot / (exportName + ".exe");
+    std::error_code error;
+
+    if (std::filesystem::exists(exportRoot))
+    {
+        std::filesystem::remove_all(exportRoot, error);
+        if (error)
+        {
+            ConsoleLog::Error("Failed to clean export folder: " + error.message());
+            return;
+        }
+    }
+
+    std::filesystem::create_directories(exportRoot / "Scenes", error);
+    if (error)
+    {
+        ConsoleLog::Error("Failed to create export folder: " + exportRoot.string());
+        return;
+    }
+
+    const std::filesystem::path playerExecutable = GetPlayerExecutablePath();
+    if (!std::filesystem::exists(playerExecutable))
+    {
+        ConsoleLog::Error("Failed to export player: build MersoPlayer.exe first.");
+        return;
+    }
+
+    std::filesystem::copy_file(playerExecutable, exportExecutable, std::filesystem::copy_options::overwrite_existing, error);
+    if (error)
+    {
+        ConsoleLog::Error("Failed to export executable: " + error.message());
+        return;
+    }
+
+    std::filesystem::copy("Shaders", exportRoot / "Shaders", std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing, error);
+    if (error)
+    {
+        ConsoleLog::Error("Failed to export shaders: " + error.message());
+        return;
+    }
+
+    std::filesystem::copy("Assets", exportRoot / "Assets", std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing, error);
+    if (error)
+    {
+        ConsoleLog::Error("Failed to export assets: " + error.message());
+        return;
+    }
+
+    std::filesystem::copy_file(GetProjectSavePath(scene), exportScene, std::filesystem::copy_options::overwrite_existing, error);
+    if (error)
+    {
+        ConsoleLog::Error("Failed to export scene file: " + error.message());
+        return;
+    }
+
+    std::ofstream launcher(exportRoot / "PLAY.bat");
+    launcher << "@echo off\n";
+    launcher << "cd /d \"%~dp0\"\n";
+    launcher << "\"" << exportName << ".exe\"\n";
+
+    ConsoleLog::Info("Exported project: " + exportRoot.string());
+}
+
+}
 
 bool EditorGui::Initialize(GLFWwindow* window)
 {
@@ -59,7 +192,7 @@ void EditorGui::BeginFrame()
     ImGui::NewFrame();
 }
 
-void EditorGui::Draw(Scene& scene, Renderer& renderer, float deltaTime, unsigned int viewportTextureId)
+void EditorGui::Draw(Scene& scene, Renderer& renderer, const Input& input, float deltaTime, unsigned int viewportTextureId)
 {
     m_EditingText = false;
 
@@ -74,11 +207,7 @@ void EditorGui::Draw(Scene& scene, Renderer& renderer, float deltaTime, unsigned
     DrawConsole();
     DrawControls();
 
-    if (!m_EditingText && ImGui::IsKeyPressed(ImGuiKey_Delete))
-    {
-        scene.DeleteSelected();
-        ConsoleLog::Info("Deleted selected object");
-    }
+    HandleKeyboardShortcuts(scene, input);
 }
 void EditorGui::EndFrame()
 {
@@ -117,22 +246,7 @@ void EditorGui::DrawMenuBar(Scene& scene)
     {
         if (ImGui::BeginMenu("File"))
         {
-            if (ImGui::MenuItem("New Cube", "N"))
-            {
-                scene.AddCube();
-            }
-
-            if (ImGui::MenuItem("New Terrain"))
-            {
-                scene.AddTerrain();
-            }
-
-            if (ImGui::MenuItem("Delete Selected", "Del"))
-            {
-                scene.DeleteSelected();
-                ConsoleLog::Info("Deleted selected object");
-            }
-
+            DrawProjectActionsMenu(scene);
             ImGui::EndMenu();
         }
 
@@ -478,54 +592,66 @@ void EditorGui::DrawHierarchy(Scene& scene)
 
     ImGui::Begin("Scene Hierarchy");
 
+    if (ImGui::BeginPopupContextWindow("SceneHierarchyContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+    {
+        DrawProjectActionsMenu(scene);
+        ImGui::EndPopup();
+    }
 
     const ImGuiTreeNodeFlags rootFlags =
         ImGuiTreeNodeFlags_DefaultOpen |
         ImGuiTreeNodeFlags_OpenOnArrow |
         ImGuiTreeNodeFlags_SpanAvailWidth;
 
-    if (ImGui::TreeNodeEx("First project", rootFlags))
+    const std::string rootLabel = scene.GetProjectName() + "##ProjectRoot";
+    if (ImGui::TreeNodeEx(rootLabel.c_str(), rootFlags))
     {
-        const auto& objects = scene.GetObjects();
-        for (int index = 0; index < static_cast<int>(objects.size()); index++)
+        const std::string sceneLabel = scene.GetSceneName() + "##SceneRoot";
+        if (ImGui::TreeNodeEx(sceneLabel.c_str(), rootFlags))
         {
-            const bool selected = index == scene.GetSelectedIndex();
-            std::string label = objects[index].Name.empty() ? "Unnamed" : objects[index].Name;
-            label += "##SceneObject" + std::to_string(index);
-
-            ImGuiTreeNodeFlags objectFlags =
-                ImGuiTreeNodeFlags_DefaultOpen |
-                ImGuiTreeNodeFlags_OpenOnArrow |
-                ImGuiTreeNodeFlags_SpanAvailWidth;
-
-            if (selected)
+            const auto& objects = scene.GetObjects();
+            for (int index = 0; index < static_cast<int>(objects.size()); index++)
             {
-                objectFlags |= ImGuiTreeNodeFlags_Selected;
-            }
+                const bool selected = index == scene.GetSelectedIndex();
+                std::string label = objects[index].Name.empty() ? "Unnamed" : objects[index].Name;
+                label += "##SceneObject" + std::to_string(index);
 
-            const bool open = ImGui::TreeNodeEx(label.c_str(), objectFlags);
-            if (ImGui::IsItemClicked())
-            {
-                scene.Select(index);
-            }
+                ImGuiTreeNodeFlags objectFlags =
+                    ImGuiTreeNodeFlags_DefaultOpen |
+                    ImGuiTreeNodeFlags_OpenOnArrow |
+                    ImGuiTreeNodeFlags_SpanAvailWidth;
 
-            if (open)
-            {
-                const char* collisionText = "Collision: None";
-                if (objects[index].CollisionShape == CollisionShapeType::Box)
+                if (selected)
                 {
-                    collisionText = "Collision: Box";
-                }
-                else if (objects[index].CollisionShape == CollisionShapeType::Terrain)
-                {
-                    collisionText = "Collision: Terrain";
+                    objectFlags |= ImGuiTreeNodeFlags_Selected;
                 }
 
-                ImGui::Indent(12.0f);
-                ImGui::TextDisabled("%s", collisionText);
-                ImGui::Unindent(12.0f);
-                ImGui::TreePop();
+                const bool open = ImGui::TreeNodeEx(label.c_str(), objectFlags);
+                if (ImGui::IsItemClicked())
+                {
+                    scene.Select(index);
+                }
+
+                if (open)
+                {
+                    const char* collisionText = "Collision: None";
+                    if (objects[index].CollisionShape == CollisionShapeType::Box)
+                    {
+                        collisionText = "Collision: Box";
+                    }
+                    else if (objects[index].CollisionShape == CollisionShapeType::Terrain)
+                    {
+                        collisionText = "Collision: Terrain";
+                    }
+
+                    ImGui::Indent(12.0f);
+                    ImGui::TextDisabled("%s", collisionText);
+                    ImGui::Unindent(12.0f);
+                    ImGui::TreePop();
+                }
             }
+
+            ImGui::TreePop();
         }
 
         ImGui::TreePop();
@@ -533,6 +659,122 @@ void EditorGui::DrawHierarchy(Scene& scene)
 
     ImGui::End();
 }
+
+void EditorGui::DrawProjectActionsMenu(Scene& scene)
+{
+    if (ImGui::MenuItem("New Project"))
+    {
+        scene.NewProject();
+        ConsoleLog::Info("Created new project");
+    }
+
+    ImGui::Separator();
+
+    const std::string& projectName = scene.GetProjectName();
+    if (projectName != m_ProjectNameBuffer.data())
+    {
+        m_ProjectNameBuffer.fill(0);
+        projectName.copy(m_ProjectNameBuffer.data(), m_ProjectNameBuffer.size() - 1);
+    }
+
+    ImGui::TextUnformatted("Project");
+    ImGui::SetNextItemWidth(180.0f);
+    if (ImGui::InputText("##ProjectNameMenu", m_ProjectNameBuffer.data(), m_ProjectNameBuffer.size()))
+    {
+        scene.SetProjectName(m_ProjectNameBuffer.data());
+    }
+
+    if (ImGui::IsItemActive())
+    {
+        m_EditingText = true;
+    }
+
+    const std::string& sceneName = scene.GetSceneName();
+    if (sceneName != m_SceneNameBuffer.data())
+    {
+        m_SceneNameBuffer.fill(0);
+        sceneName.copy(m_SceneNameBuffer.data(), m_SceneNameBuffer.size() - 1);
+    }
+
+    ImGui::TextUnformatted("Scene");
+    ImGui::SetNextItemWidth(180.0f);
+    if (ImGui::InputText("##SceneNameMenu", m_SceneNameBuffer.data(), m_SceneNameBuffer.size()))
+    {
+        scene.SetSceneName(m_SceneNameBuffer.data());
+    }
+
+    if (ImGui::IsItemActive())
+    {
+        m_EditingText = true;
+    }
+
+    if (ImGui::MenuItem("Save Project", "Ctrl+S"))
+    {
+        SaveProject(scene);
+    }
+
+    if (ImGui::MenuItem("Export Project"))
+    {
+        ExportProject(scene);
+    }
+
+    ImGui::Separator();
+
+    if (ImGui::MenuItem("New Cube", "Ctrl+N"))
+    {
+        scene.AddCube();
+    }
+
+    if (ImGui::MenuItem("New Circle"))
+    {
+        scene.AddCircle();
+    }
+
+    if (ImGui::MenuItem("New Character"))
+    {
+        scene.AddCharacter();
+    }
+
+    if (ImGui::MenuItem("New Terrain"))
+    {
+        scene.AddTerrain();
+    }
+
+    if (ImGui::MenuItem("Delete Selected", "Ctrl+Del"))
+    {
+        scene.DeleteSelected();
+        ConsoleLog::Info("Deleted selected object");
+    }
+}
+
+void EditorGui::HandleKeyboardShortcuts(Scene& scene, const Input& input)
+{
+    const bool controlPressed = input.IsKeyPressed(GLFW_KEY_LEFT_CONTROL) || input.IsKeyPressed(GLFW_KEY_RIGHT_CONTROL);
+
+    if (controlPressed && input.IsKeyJustPressed(GLFW_KEY_S))
+    {
+        SaveProject(scene);
+        return;
+    }
+
+    if (m_EditingText || ImGui::GetIO().WantTextInput)
+    {
+        return;
+    }
+
+    if (controlPressed && input.IsKeyJustPressed(GLFW_KEY_N))
+    {
+        scene.AddCube();
+        return;
+    }
+
+    if (controlPressed && input.IsKeyJustPressed(GLFW_KEY_DELETE))
+    {
+        scene.DeleteSelected();
+        ConsoleLog::Info("Deleted selected object");
+    }
+}
+
 void EditorGui::DrawInspector(Scene& scene)
 {
     ImGui::SetNextWindowPos(ImVec2(980.0f, 30.0f), ImGuiCond_FirstUseEver);
@@ -547,33 +789,6 @@ void EditorGui::DrawInspector(Scene& scene)
         ImGui::End();
         return;
     }
-
-    const int selectedIndex = scene.GetSelectedIndex();
-    if (m_NameEditIndex != selectedIndex)
-    {
-        m_NameEditIndex = selectedIndex;
-        m_NameBuffer.fill(0);
-        selected->Name.copy(m_NameBuffer.data(), m_NameBuffer.size() - 1);
-    }
-
-    if (ImGui::InputText("Name", m_NameBuffer.data(), m_NameBuffer.size()))
-    {
-        selected->Name = m_NameBuffer.data();
-    }
-
-    if (ImGui::IsItemActive())
-    {
-        m_EditingText = true;
-    }
-
-    if (ImGui::IsItemDeactivatedAfterEdit() && selected->Name.empty())
-    {
-        selected->Name = "Unnamed";
-        m_NameBuffer.fill(0);
-        selected->Name.copy(m_NameBuffer.data(), m_NameBuffer.size() - 1);
-    }
-
-    ImGui::Separator();
 
     const char* typeText = "Cube";
     if (selected->Type == SceneObjectType::Circle)

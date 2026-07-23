@@ -12,8 +12,9 @@ namespace Engine
 Application::Application() = default;
 Application::~Application() = default;
 
-bool Application::Initialize()
+bool Application::Initialize(bool playOnly, const std::string& scenePath)
 {
+    m_PlayOnly = playOnly;
     m_Window = std::make_unique<Window>(1280, 720, "Merso");
     if (!m_Window->Initialize())
     {
@@ -46,7 +47,23 @@ bool Application::Initialize()
         return false;
     }
 
-    if (!m_Gui.Initialize(m_Window->GetNativeWindow()))
+    if (!scenePath.empty() && !m_Scene.LoadFromFile(scenePath))
+    {
+        std::cerr << "Failed to load scene: " << scenePath << std::endl;
+    }
+
+    if (m_PlayOnly)
+    {
+        m_Window->SetTitle(m_Scene.GetProjectName());
+        LightingSettings& lighting = m_Renderer->GetLightingSettings();
+        lighting.DirectionX = -0.20f;
+        lighting.DirectionY = -0.38f;
+        lighting.DirectionZ = 0.92f;
+        lighting.Intensity = 1.15f;
+        lighting.AmbientStrength = 0.48f;
+    }
+
+    if (!m_PlayOnly && !m_Gui.Initialize(m_Window->GetNativeWindow()))
     {
         std::cerr << "Failed to initialize editor GUI" << std::endl;
         return false;
@@ -68,7 +85,20 @@ void Application::Run()
 
         m_Window->PollEvents();
         m_Input.Update(m_Window->GetNativeWindow());
-        m_Gui.BeginFrame();
+        if (!m_PlayOnly)
+        {
+            m_Gui.BeginFrame();
+        }
+
+        if (m_PlayOnly)
+        {
+            m_Window->SetCursorCaptured(true);
+            UpdatePlayMode(deltaTime, false, false);
+            UpdatePlayCamera();
+            m_Renderer->RenderSceneToScreen(m_Scene, m_Window->GetWidth(), m_Window->GetHeight());
+            m_Window->SwapBuffers();
+            continue;
+        }
 
         const bool viewportHovered = m_Gui.IsViewportHovered();
         const bool cameraToolActive = m_Gui.IsCameraToolSelected();
@@ -116,7 +146,7 @@ void Application::Run()
         m_Renderer->RenderSceneToViewport(m_Scene, m_Gui.GetViewportWidth(), m_Gui.GetViewportHeight());
         m_Renderer->BeginScreenFrame(m_Window->GetWidth(), m_Window->GetHeight(), 0.035f, 0.038f, 0.045f, 1.0f);
 
-        m_Gui.Draw(m_Scene, *m_Renderer, deltaTime, m_Renderer->GetViewportTextureId());
+        m_Gui.Draw(m_Scene, *m_Renderer, m_Input, deltaTime, m_Renderer->GetViewportTextureId());
         m_Gui.EndFrame();
 
         m_Window->SwapBuffers();
@@ -131,6 +161,17 @@ int Application::FindCharacterIndex() const
         if (objects[index].Type == SceneObjectType::Character)
         {
             return index;
+        }
+    }
+
+    if (m_PlayOnly)
+    {
+        for (int index = 0; index < static_cast<int>(objects.size()); index++)
+        {
+            if (objects[index].Type != SceneObjectType::Terrain)
+            {
+                return index;
+            }
         }
     }
 
@@ -390,25 +431,63 @@ void Application::UpdatePlayMode(float deltaTime, bool textInputActive, bool cam
     SceneObject& character = m_Scene.GetObjects()[characterIndex];
     ResolveCharacterCollisions(character);
 
+    constexpr float MouseLookSpeed = 0.0035f;
+    constexpr float KeyboardLookSpeed = 2.2f;
+
+    m_PlayCameraYaw += static_cast<float>(m_Input.GetMouseDeltaX()) * MouseLookSpeed;
+    m_PlayCameraPitch -= static_cast<float>(m_Input.GetMouseDeltaY()) * MouseLookSpeed;
+    if (m_Input.IsKeyPressed(GLFW_KEY_LEFT))
+    {
+        m_PlayCameraYaw -= KeyboardLookSpeed * deltaTime;
+    }
+
+    if (m_Input.IsKeyPressed(GLFW_KEY_RIGHT))
+    {
+        m_PlayCameraYaw += KeyboardLookSpeed * deltaTime;
+    }
+
+    if (m_Input.IsKeyPressed(GLFW_KEY_UP))
+    {
+        m_PlayCameraPitch += KeyboardLookSpeed * deltaTime;
+    }
+
+    if (m_Input.IsKeyPressed(GLFW_KEY_DOWN))
+    {
+        m_PlayCameraPitch -= KeyboardLookSpeed * deltaTime;
+    }
+
+    m_PlayCameraPitch = std::clamp(m_PlayCameraPitch, -0.45f, 1.05f);
+
     Vec3 movement;
+    const Vec3 forward = {std::sin(m_PlayCameraYaw), 0.0f, -std::cos(m_PlayCameraYaw)};
+    const Vec3 right = {std::cos(m_PlayCameraYaw), 0.0f, std::sin(m_PlayCameraYaw)};
     if (m_Input.IsKeyPressed(GLFW_KEY_W))
     {
-        movement.z -= 1.0f;
+        movement.x += forward.x;
+        movement.z += forward.z;
     }
 
     if (m_Input.IsKeyPressed(GLFW_KEY_S))
     {
-        movement.z += 1.0f;
+        movement.x -= forward.x;
+        movement.z -= forward.z;
     }
 
     if (m_Input.IsKeyPressed(GLFW_KEY_A))
     {
-        movement.x -= 1.0f;
+        movement.x -= right.x;
+        movement.z -= right.z;
     }
 
     if (m_Input.IsKeyPressed(GLFW_KEY_D))
     {
-        movement.x += 1.0f;
+        movement.x += right.x;
+        movement.z += right.z;
+    }
+
+    if (m_Input.IsKeyPressed(GLFW_KEY_SPACE))
+    {
+        m_JumpQueued = true;
     }
 
     const float groundY = FindCharacterSupportY(character, character.TransformData.Position.x, character.TransformData.Position.z, character.TransformData.Position.y);
@@ -420,12 +499,6 @@ void Application::UpdatePlayMode(float deltaTime, bool textInputActive, bool cam
         {
             m_CharacterVerticalVelocity = 0.0f;
         }
-    }
-
-    if (m_CharacterGrounded && m_Input.IsKeyJustPressed(GLFW_KEY_SPACE))
-    {
-        m_CharacterVerticalVelocity = 4.8f;
-        m_CharacterGrounded = false;
     }
 
     const float length = std::sqrt(movement.x * movement.x + movement.z * movement.z);
@@ -452,6 +525,28 @@ void Application::UpdatePlayMode(float deltaTime, bool textInputActive, bool cam
         }
     }
 
+    const float movedGroundY = FindCharacterSupportY(character, character.TransformData.Position.x, character.TransformData.Position.z, character.TransformData.Position.y);
+    m_CharacterGrounded = character.TransformData.Position.y <= movedGroundY + 0.08f;
+    if (m_CharacterGrounded)
+    {
+        character.TransformData.Position.y = movedGroundY;
+        if (m_CharacterVerticalVelocity < 0.0f)
+        {
+            m_CharacterVerticalVelocity = 0.0f;
+        }
+    }
+
+    if (m_CharacterGrounded && m_JumpQueued)
+    {
+        m_CharacterVerticalVelocity = 5.4f;
+        m_CharacterGrounded = false;
+        m_JumpQueued = false;
+    }
+    else if (!m_Input.IsKeyPressed(GLFW_KEY_SPACE))
+    {
+        m_JumpQueued = false;
+    }
+
     m_CharacterVerticalVelocity -= 9.8f * deltaTime;
     character.TransformData.Position.y += m_CharacterVerticalVelocity * deltaTime;
 
@@ -465,6 +560,18 @@ void Application::UpdatePlayMode(float deltaTime, bool textInputActive, bool cam
 
     ResolveCharacterCollisions(character);
 }
+
+void Application::UpdatePlayCamera()
+{
+    const int characterIndex = FindCharacterIndex();
+    if (characterIndex < 0)
+    {
+        return;
+    }
+
+    m_Renderer->FollowCharacter(m_Scene.GetObjects()[characterIndex], m_PlayCameraYaw, m_PlayCameraPitch, m_PlayCameraDistance);
+}
+
 void Application::Shutdown()
 {
     m_Gui.Shutdown();
@@ -474,14 +581,6 @@ void Application::Shutdown()
 }
 
 }
-
-
-
-
-
-
-
-
 
 
 

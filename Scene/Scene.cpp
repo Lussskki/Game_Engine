@@ -23,6 +23,11 @@ int ObjectTypeToInt(SceneObjectType type)
         return 2;
     }
 
+    if (type == SceneObjectType::Character)
+    {
+        return 4;
+    }
+
     return 0;
 }
 int CollisionShapeToInt(CollisionShapeType shape)
@@ -51,7 +56,17 @@ SceneObjectType ObjectTypeFromInt(int value)
         return SceneObjectType::Terrain;
     }
 
+    if (value == 4)
+    {
+        return SceneObjectType::Character;
+    }
+
     return SceneObjectType::Cube;
+}
+
+bool HasPrefix(const std::string& text, const std::string& prefix)
+{
+    return text.size() >= prefix.size() && text.compare(0, prefix.size(), prefix) == 0;
 }
 CollisionShapeType CollisionShapeFromInt(int value)
 {
@@ -72,6 +87,34 @@ CollisionShapeType CollisionShapeFromInt(int value)
 
 Scene::Scene()
 {
+}
+
+void Scene::NewProject(const std::string& projectName, const std::string& sceneName)
+{
+    SetProjectName(projectName);
+    SetSceneName(sceneName);
+    m_Objects.clear();
+    m_SelectedIndex = 0;
+}
+
+void Scene::SetProjectName(const std::string& projectName)
+{
+    m_ProjectName = projectName.empty() ? "Untitled Project" : projectName;
+}
+
+void Scene::SetSceneName(const std::string& sceneName)
+{
+    m_SceneName = sceneName.empty() ? "Main Scene" : sceneName;
+}
+
+const std::string& Scene::GetProjectName() const
+{
+    return m_ProjectName;
+}
+
+const std::string& Scene::GetSceneName() const
+{
+    return m_SceneName;
 }
 
 void Scene::AddCube()
@@ -192,7 +235,9 @@ bool Scene::SaveToFile(const std::string& path) const
         return false;
     }
 
-    file << "RendererScene 2\n";
+    file << "RendererScene 4\n";
+    file << m_ProjectName << "\n";
+    file << m_SceneName << "\n";
     file << m_SelectedIndex << "\n";
     file << m_Objects.size() << "\n";
 
@@ -222,10 +267,31 @@ bool Scene::LoadFromFile(const std::string& path)
     std::string header;
     int version = 0;
     file >> header >> version;
-    if (header != "RendererScene" || version < 1 || version > 2)
+    if (header != "RendererScene" || version < 1 || version > 4)
     {
         ConsoleLog::Error("Unsupported scene file: " + path);
         return false;
+    }
+
+    std::string projectName = "Untitled Project";
+    std::string sceneName = "Main Scene";
+    if (version >= 3)
+    {
+        file.ignore(1024, '\n');
+        std::getline(file, projectName);
+        if (projectName.empty())
+        {
+            projectName = "Untitled Project";
+        }
+
+        if (version >= 4)
+        {
+            std::getline(file, sceneName);
+            if (sceneName.empty())
+            {
+                sceneName = "Main Scene";
+            }
+        }
     }
 
     int selectedIndex = 0;
@@ -246,6 +312,14 @@ bool Scene::LoadFromFile(const std::string& path)
             file >> objectType >> collisionShape;
             object.Type = ObjectTypeFromInt(objectType);
             object.CollisionShape = CollisionShapeFromInt(collisionShape);
+            if (objectType == 0 && HasPrefix(object.Name, "Character"))
+            {
+                object.Type = SceneObjectType::Character;
+            }
+            else if (objectType == 0 && HasPrefix(object.Name, "Circle"))
+            {
+                object.Type = SceneObjectType::Circle;
+            }
         }
         else
         {
@@ -267,6 +341,8 @@ bool Scene::LoadFromFile(const std::string& path)
         loadedObjects.push_back(object);
     }
 
+    m_ProjectName = projectName;
+    m_SceneName = sceneName;
     m_Objects = loadedObjects;
     if (m_Objects.empty())
     {

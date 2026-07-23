@@ -54,13 +54,13 @@ void main()
     color = mix(nightTint, color, clamp(ambient + intensity * 0.45, 0.0, 1.0));
 
     float sunFacing = dot(viewRay, sunDirection);
-    float sunDisc = smoothstep(0.9950, 0.9975, sunFacing);
-    float sunGlow = smoothstep(0.9400, 0.9950, sunFacing);
+    float sunDisc = smoothstep(0.9880, 0.9940, sunFacing);
+    float sunGlow = smoothstep(0.8600, 0.9880, sunFacing);
     float sunPower = clamp(intensity, 0.0, 3.0);
 
     vec3 glowColor = mix(vec3(1.0, 0.55, 0.18), vec3(1.0, 0.84, 0.30), sunHeight);
     vec3 discColor = vec3(1.0, 0.86, 0.12);
-    color += glowColor * sunGlow * sunPower * 0.55;
+    color += glowColor * sunGlow * sunPower * 0.85;
     color = mix(color, discColor, clamp(sunDisc * sunPower, 0.0, 1.0));
 
     FragColor = vec4(color, 1.0);

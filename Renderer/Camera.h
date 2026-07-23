@@ -14,6 +14,8 @@ public:
     void MoveRight(float amount);
     void MoveUp(float amount);
     void Rotate(float yawDelta, float pitchDelta);
+    void SetPosition(Vec3 position);
+    void LookAt(Vec3 target);
     
     std::array<float, 16> GetViewProjection(float aspectRatio) const;
     Vec3 GetPosition() const;

@@ -12,6 +12,8 @@ void Input::Update(GLFWwindow* window)
 
     static constexpr int UsedKeys[] = {
         GLFW_KEY_ESCAPE,
+        GLFW_KEY_LEFT_CONTROL,
+        GLFW_KEY_RIGHT_CONTROL,
         GLFW_KEY_LEFT_SHIFT,
         GLFW_KEY_RIGHT_SHIFT,
         GLFW_KEY_TAB,

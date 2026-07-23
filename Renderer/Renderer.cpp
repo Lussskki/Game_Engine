@@ -179,6 +179,24 @@ void Renderer::UpdateCamera(const Input& input, float deltaTime, bool allowMouse
     }
 }
 
+void Renderer::FollowCharacter(const SceneObject& character, float yaw, float pitch, float distance)
+{
+    const float horizontalDistance = std::cos(pitch) * distance;
+    const Vec3 target = {
+        character.TransformData.Position.x,
+        character.TransformData.Position.y + 0.45f,
+        character.TransformData.Position.z
+    };
+    const Vec3 cameraPosition = {
+        target.x - std::sin(yaw) * horizontalDistance,
+        target.y + std::sin(pitch) * distance,
+        target.z + std::cos(yaw) * horizontalDistance
+    };
+
+    m_Camera.SetPosition(cameraPosition);
+    m_Camera.LookAt(target);
+}
+
 void Renderer::ZoomCamera(float amount)
 {
     m_Camera.MoveForward(amount);
@@ -209,9 +227,19 @@ void Renderer::RenderSceneToViewport(const Scene& scene, int width, int height)
 
     const float aspectRatio = height > 0 ? static_cast<float>(width) / static_cast<float>(height) : 1.0f;
     DrawSkyBackground(m_Camera.GetYaw(), m_Camera.GetPitch(), aspectRatio);
-    DrawScene(scene, aspectRatio);
+    DrawScene(scene, aspectRatio, true);
 
     m_ViewportFramebuffer->Unbind();
+}
+
+void Renderer::RenderSceneToScreen(const Scene& scene, int width, int height)
+{
+    BeginScreenFrame(width, height, 0.50f, 0.62f, 0.74f, 1.0f);
+    glEnable(GL_DEPTH_TEST);
+
+    const float aspectRatio = height > 0 ? static_cast<float>(width) / static_cast<float>(height) : 1.0f;
+    DrawSkyBackground(m_Camera.GetYaw(), m_Camera.GetPitch(), aspectRatio);
+    DrawScene(scene, aspectRatio, false);
 }
 
 unsigned int Renderer::GetViewportTextureId() const
@@ -412,7 +440,7 @@ void Renderer::DrawCollisionShapes(const Scene& scene) const
 
         if (object.CollisionShape == CollisionShapeType::Terrain && object.Type == SceneObjectType::Terrain)
         {
-            m_Shader->SetVec3("u_SolidColor", 0.25f, 0.95f, 0.45f);
+            m_Shader->SetVec3("u_SolidColor", 0.100f, 0.50f, 0.40f);
             m_Shader->SetMat4("u_Model", object.TransformData.GetMatrix());
             m_TerrainMesh->Draw();
         }
@@ -429,7 +457,7 @@ void Renderer::DrawCollisionShapes(const Scene& scene) const
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glDepthFunc(GL_LESS);
 }
-void Renderer::DrawScene(const Scene& scene, float aspectRatio) const
+void Renderer::DrawScene(const Scene& scene, float aspectRatio, bool drawEditorOverlays) const
 {
     const auto viewProjection = m_Camera.GetViewProjection(aspectRatio);
 
@@ -448,9 +476,12 @@ void Renderer::DrawScene(const Scene& scene, float aspectRatio) const
         0.0f, 0.0f, 0.0f, 1.0f
     };
 
-    glLineWidth(1.0f);
-    m_Shader->SetMat4("u_Model", gridModel);
-    m_GridMesh->DrawLines();
+    if (drawEditorOverlays)
+    {
+        glLineWidth(1.0f);
+        m_Shader->SetMat4("u_Model", gridModel);
+        m_GridMesh->DrawLines();
+    }
 
     const auto& objects = scene.GetObjects();
     for (const SceneObject& object : objects)
@@ -489,6 +520,11 @@ void Renderer::DrawScene(const Scene& scene, float aspectRatio) const
         {
             m_CubeMesh->Draw();
         }
+    }
+
+    if (!drawEditorOverlays)
+    {
+        return;
     }
 
     DrawCollisionShapes(scene);

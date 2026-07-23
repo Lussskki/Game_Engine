@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Input/Input.h"
 #include "Renderer/Renderer.h"
 #include "Scene/Scene.h"
 
@@ -34,7 +35,7 @@ public:
     void Shutdown();
 
     void BeginFrame();
-    void Draw(Scene& scene, Renderer& renderer, float deltaTime, unsigned int viewportTextureId);
+    void Draw(Scene& scene, Renderer& renderer, const Input& input, float deltaTime, unsigned int viewportTextureId);
     void EndFrame();
 
     bool WantsMouseCapture() const;
@@ -98,6 +99,8 @@ private:
     void DrawLighting(Renderer& renderer);
     void DrawControls();
     void DrawToolbar();
+    void DrawProjectActionsMenu(Scene& scene);
+    void HandleKeyboardShortcuts(Scene& scene, const Input& input);
     void HandleViewportMouse(Scene& scene, Renderer& renderer);
 
 
@@ -115,8 +118,8 @@ private:
     int m_ViewportHeight = 600;
     float m_ViewportImageMinX = 0.0f;
     float m_ViewportImageMinY = 0.0f;
-    int m_NameEditIndex = -1;
-    std::array<char, 128> m_NameBuffer = {};
+    std::array<char, 128> m_ProjectNameBuffer = {};
+    std::array<char, 128> m_SceneNameBuffer = {};
 };
 
 }

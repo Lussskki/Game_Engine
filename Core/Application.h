@@ -8,6 +8,7 @@
 #include "Scene/Scene.h"
 
 #include <memory>
+#include <string>
 
 namespace Engine
 {
@@ -18,12 +19,13 @@ public:
     Application();
     ~Application();
 
-    bool Initialize();
+    bool Initialize(bool playOnly = false, const std::string& scenePath = "");
     void Run();
     void Shutdown();
 
 private:
     void UpdatePlayMode(float deltaTime, bool textInputActive, bool cameraLookActive);
+    void UpdatePlayCamera();
     int FindCharacterIndex() const;
     float FindGroundY(float x, float z, float fallbackY) const;
     float FindCharacterSupportY(const SceneObject& character, float x, float z, float fallbackY) const;
@@ -31,6 +33,7 @@ private:
     void ResolveCharacterCollisions(SceneObject& character);
     float m_CharacterVerticalVelocity = 0.0f;
     bool m_CharacterGrounded = false;
+    bool m_JumpQueued = false;
     std::unique_ptr<Window> m_Window;
     std::unique_ptr<Renderer> m_Renderer;
     Scene m_Scene;
@@ -38,6 +41,10 @@ private:
     EditorController m_Editor;
     EditorGui m_Gui;
     bool m_Running = false;
+    bool m_PlayOnly = false;
+    float m_PlayCameraYaw = 0.0f;
+    float m_PlayCameraPitch = 0.25f;
+    float m_PlayCameraDistance = 4.0f;
 };
 
 }

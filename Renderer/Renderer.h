@@ -31,10 +31,12 @@ public:
 
     bool Initialize();
     void UpdateCamera(const Input& input, float deltaTime, bool allowMouseLook);
+    void FollowCharacter(const SceneObject& character, float yaw, float pitch, float distance);
     void ZoomCamera(float amount);
     void PanCamera(float rightAmount, float upAmount);
     void BeginScreenFrame(int width, int height, float r, float g, float b, float a) const;
     void RenderSceneToViewport(const Scene& scene, int width, int height);
+    void RenderSceneToScreen(const Scene& scene, int width, int height);
     bool ProjectWorldToViewport(const Vec3& worldPosition, int width, int height, float& x, float& y) const;
     bool ViewportPointToPlane(float x, float y, int width, int height, float planeY, Vec3& worldPosition) const;
 
@@ -43,7 +45,7 @@ public:
 
 private:
     void DrawSkyBackground(float cameraYaw, float cameraPitch, float aspectRatio) const;
-    void DrawScene(const Scene& scene, float aspectRatio) const;
+    void DrawScene(const Scene& scene, float aspectRatio, bool drawEditorOverlays) const;
     void DrawPlanarShadows(const Scene& scene, float shadowPlaneY) const;
     void DrawCollisionShapes(const Scene& scene) const;
     float FindShadowPlaneY(const Scene& scene) const;

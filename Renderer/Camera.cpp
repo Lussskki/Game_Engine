@@ -34,6 +34,28 @@ void Camera::Rotate(float yawDelta, float pitchDelta)
     m_Pitch = std::clamp(m_Pitch, -1.45f, 1.45f);
 }
 
+void Camera::SetPosition(Vec3 position)
+{
+    m_Position = {position.x, position.y, position.z};
+}
+
+void Camera::LookAt(Vec3 target)
+{
+    const Vector3 direction = {
+        target.x - m_Position.x,
+        target.y - m_Position.y,
+        target.z - m_Position.z
+    };
+    const float length = std::sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
+    if (length <= 0.00001f)
+    {
+        return;
+    }
+
+    m_Yaw = std::atan2(direction.z, direction.x);
+    m_Pitch = std::asin(std::clamp(direction.y / length, -1.0f, 1.0f));
+}
+
 std::array<float, 16> Camera::GetViewProjection(float aspectRatio) const
 {
     const float fieldOfView = 45.0f * 3.1415926535f / 180.0f;
